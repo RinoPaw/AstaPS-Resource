@@ -8,6 +8,7 @@
   "id": 351,
   "subQuests": [
     {
+      "finishCondComb": "LOGIC_OR",
       "finishCond": [
         {
           "param": [
@@ -80,6 +81,7 @@
       "mainId": 351
     },
     {
+      "acceptCondComb": "LOGIC_OR",
       "finishCond": [
         {
           "param": [
@@ -105,6 +107,7 @@
       "mainId": 351
     },
     {
+      "acceptCondComb": "LOGIC_AND",
       "finishCond": [
         {
           "param": [
@@ -136,6 +139,14 @@
             0
           ],
           "type": "QUEST_CONTENT_FINISH_PLOT"
+        }
+      ],
+      "beginExec": [
+        {
+          "param": [
+            "1"
+          ],
+          "type": "QUEST_EXEC_SET_IS_GAME_TIME_LOCKED"
         }
       ],
       "order": 1,
