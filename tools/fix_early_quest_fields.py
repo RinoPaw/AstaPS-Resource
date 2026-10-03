@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+
+
+DEFAULT_PATH = Path("ExcelBinOutput/QuestExcelConfigData.json")
+
+
+def iter_top_level_objects(text: str):
+    """Yield (start, end) slices for objects in the top-level JSON array."""
+    depth = 0
+    in_string = False
+    escaped = False
+    start = None
+
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth == 0:
+                raise ValueError(f"Unexpected closing brace at offset {i}")
+            depth -= 1
+            if depth == 0 and start is not None:
+                yield start, i + 1
+                start = None
+
+    if in_string:
+        raise ValueError("Unterminated JSON string")
+    if depth != 0:
+        raise ValueError("Unbalanced JSON object braces")
+
+
+def meaningful_execs(value):
+    if not isinstance(value, list):
+        return []
+    return [entry for entry in value if isinstance(entry, dict) and entry.get("type")]
+
+
+def exec_entry(exec_type: str, params: list[str]) -> dict:
+    return {"param": params, "type": exec_type}
+
+
+EXPECTED_BEGIN_EXECS = {
+    # Historical intact quest resource: opening performance locks game time.
+    35104: [exec_entry("QUEST_EXEC_SET_IS_GAME_TIME_LOCKED", ["1"])],
+    # Historical intact quest 353 resource. These side effects drive the tutorial group chain.
+    35301: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,1"])],
+    35302: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,2"])],
+    35303: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003448"])],
+    35304: [
+        exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003449"]),
+        exec_entry("QUEST_EXEC_ADD_CUR_AVATAR_ENERGY", []),
+    ],
+}
+
+EXPECTED_LOGIC = {
+    # 35203 is deliberately gated by BOTH the plot completion and ENTER_REGION_901002.
+    35203: {"finishCondComb": "LOGIC_AND", "failCondComb": "LOGIC_OR"},
+}
+
+TARGETS = set(EXPECTED_BEGIN_EXECS) | set(EXPECTED_LOGIC)
+EXPECTED_MAIN = {
+    35104: 351,
+    35203: 352,
+    35301: 353,
+    35302: 353,
+    35303: 353,
+    35304: 353,
+}
+
+
+def normalized_execs(value):
+    return [
+        {"type": entry.get("type"), "param": entry.get("param", [])}
+        for entry in meaningful_execs(value)
+    ]
+
+
+def patch_record(obj: dict) -> list[str]:
+    sub_id = obj.get("subId")
+    if sub_id not in TARGETS:
+        return []
+
+    expected_main = EXPECTED_MAIN[sub_id]
+    if obj.get("mainId") != expected_main:
+        raise ValueError(
+            f"Quest {sub_id} has mainId={obj.get('mainId')}; expected {expected_main}"
+        )
+
+    changes: list[str] = []
+
+    expected_execs = EXPECTED_BEGIN_EXECS.get(sub_id)
+    if expected_execs is not None:
+        current_execs = normalized_execs(obj.get("beginExec"))
+        expected_normalized = [
+            {"type": entry["type"], "param": entry.get("param", [])}
+            for entry in expected_execs
+        ]
+        if current_execs == expected_normalized:
+            pass
+        elif not current_execs:
+            # Drop converter placeholder entries that have no type. They are filtered by AstaPS
+            # anyway and only obscure the recovered semantic resource.
+            obj["beginExec"] = expected_execs
+            changes.append(
+                "beginExec="
+                + ",".join(entry["type"] for entry in expected_execs)
+            )
+        else:
+            raise ValueError(
+                f"Quest {sub_id} has unexpected meaningful beginExec: {current_execs!r}"
+            )
+
+    for field, expected in EXPECTED_LOGIC.get(sub_id, {}).items():
+        current = obj.get(field)
+        if current == expected:
+            continue
+        if current not in (None, "", "LOGIC_NONE"):
+            raise ValueError(
+                f"Quest {sub_id} has unexpected {field}={current!r}; expected missing or {expected}"
+            )
+        obj[field] = expected
+        changes.append(f"{field}={expected}")
+
+    return changes
+
+
+def render_object(obj: dict) -> str:
+    """Render one list element with the repository's two-space outer indentation."""
+    raw = json.dumps(obj, ensure_ascii=False, indent=2)
+    lines = raw.splitlines()
+    return lines[0] + "\n" + "\n".join("  " + line for line in lines[1:])
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Recover evidence-backed early Archon quest fields lost by the 7.1 resource conversion."
+        )
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        type=Path,
+        default=DEFAULT_PATH,
+        help=f"QuestExcelConfigData.json path (default: {DEFAULT_PATH})",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate the target rows and report pending repairs without writing.",
+    )
+    args = parser.parse_args()
+
+    path: Path = args.path
+    if not path.is_file():
+        raise SystemExit(f"File not found: {path}")
+
+    original_bytes = path.read_bytes()
+    try:
+        text = original_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"{path} is not UTF-8: {exc}") from exc
+
+    root = json.loads(text)
+    if not isinstance(root, list):
+        raise SystemExit(f"{path} must contain a top-level JSON array")
+
+    found: set[int] = set()
+    replacements: list[tuple[int, int, str]] = []
+    pending: dict[int, list[str]] = {}
+
+    for start, end in iter_top_level_objects(text):
+        raw = text[start:end]
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            continue
+
+        sub_id = obj.get("subId")
+        if sub_id not in TARGETS:
+            continue
+        if sub_id in found:
+            raise SystemExit(f"Quest {sub_id} appears more than once in {path}")
+        found.add(sub_id)
+
+        changes = patch_record(obj)
+        if changes:
+            pending[sub_id] = changes
+            replacements.append((start, end, render_object(obj)))
+
+    missing = sorted(TARGETS - found)
+    if missing:
+        raise SystemExit(f"Expected quest rows not found: {missing}")
+
+    for sub_id in sorted(TARGETS):
+        if sub_id in pending:
+            print(f"Quest {sub_id}: pending: {', '.join(pending[sub_id])}")
+        else:
+            print(f"Quest {sub_id}: already correct")
+
+    if args.check:
+        if replacements:
+            print(f"Pending repaired quest rows: {len(replacements)}")
+            return 1
+        print("All evidence-backed early quest fields are already restored.")
+        return 0
+
+    if not replacements:
+        print("Nothing to do; the resource is already fixed.")
+        return 0
+
+    patched_text = text
+    for start, end, patched in reversed(replacements):
+        patched_text = patched_text[:start] + patched + patched_text[end:]
+
+    # Validate the complete generated resource before replacing it atomically.
+    parsed = json.loads(patched_text)
+    if not isinstance(parsed, list):
+        raise SystemExit("Patched resource unexpectedly stopped being a JSON array")
+
+    by_sub_id = {
+        obj.get("subId"): obj
+        for obj in parsed
+        if isinstance(obj, dict) and obj.get("subId") in TARGETS
+    }
+    for sub_id in sorted(TARGETS):
+        probe = dict(by_sub_id[sub_id])
+        if patch_record(probe):
+            raise SystemExit(f"Quest {sub_id} did not pass post-write semantic validation")
+
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(patched_text, encoding="utf-8", newline="")
+    os.replace(tmp, path)
+
+    print(f"Updated: {path}")
+    print(f"Repaired quest rows: {len(replacements)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
