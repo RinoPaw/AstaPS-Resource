@@ -1,8 +1,0 @@
-name,cmd_id,direction,status,evidence
-DoSetPlayerBornDataNotify,22899,S2C,runtime-verified,"Fresh-account client accepted the notify and entered born selection"
-SetPlayerBornDataReq,26105,C2S,runtime-verified,"Fresh-account client sent avatarId and nickname"
-SetPlayerBornDataRsp,4385,S2C,runtime-verified,"Born response sent in the validated 7.1 flow"
-PlayerNicknameNotify,3064,S2C,runtime-verified,"Nickname notification sent in the validated 7.1 flow"
-UNKNOWN_186,186,C2S,observed-unresolved,"Observed payload 7202d027 during the born/intro login trace"
-CutSceneFinishNotify,21200,C2S,mapped-not-observed,"Present in current 7.1 mapping; absent from the relevant intro trace"
-CutSceneEndNotify,472,C2S,mapped-not-observed,"Present in current 7.1 mapping; absent from the relevant intro trace"
