@@ -160,9 +160,13 @@ def patch_record(obj: dict) -> list[str]:
     if expected_accept is not None:
         current = normalized_accept(obj.get("acceptCond"))
         expected = normalized_accept(expected_accept)
+        zeroed = normalized_accept([state_equal(0)])
         if current == expected:
             pass
-        elif not current:
+        elif not current or current == zeroed:
+            # The 7.1 converter is known to preserve STATE_EQUAL/FINISHED while zeroing the
+            # predecessor subquest id. That exact damaged shape is safe to repair from the intact
+            # historical quest graph. Any other meaningful predecessor still aborts below.
             obj["acceptCond"] = expected_accept
             predecessor = expected_accept[0]["param"][0]
             changes.append(f"acceptCond={predecessor}:FINISHED")
