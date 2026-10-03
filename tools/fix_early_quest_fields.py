@@ -90,6 +90,15 @@ EXPECTED_ACCEPT = {
     35311: [state_equal(35304)],
 }
 
+# Exact converter-damaged variants observed in the 7.1 dump. Keep these per-subquest instead of
+# accepting arbitrary alternative predecessors: 35312 was serialized as a sequential successor of
+# 35301 even though the intact graph starts both from 35205; some dumps then serialize 35302 after
+# 35312 for the same reason.
+KNOWN_DAMAGED_ACCEPT = {
+    35312: [[state_equal(35301)]],
+    35302: [[state_equal(35312)]],
+}
+
 EXPECTED_LOGIC = {
     35100: {"finishCondComb": "LOGIC_OR"},
     35103: {"acceptCondComb": "LOGIC_AND"},
@@ -160,13 +169,17 @@ def patch_record(obj: dict) -> list[str]:
     if expected_accept is not None:
         current = normalized_accept(obj.get("acceptCond"))
         expected = normalized_accept(expected_accept)
-        zeroed = normalized_accept([state_equal(0)])
+        damaged = [normalized_accept([state_equal(0)])]
+        damaged.extend(
+            normalized_accept(variant)
+            for variant in KNOWN_DAMAGED_ACCEPT.get(sub_id, [])
+        )
         if current == expected:
             pass
-        elif not current or current == zeroed:
-            # The 7.1 converter is known to preserve STATE_EQUAL/FINISHED while zeroing the
-            # predecessor subquest id. That exact damaged shape is safe to repair from the intact
-            # historical quest graph. Any other meaningful predecessor still aborts below.
+        elif not current or current in damaged:
+            # The 7.1 converter is known to either zero the predecessor id or sequentialize one of
+            # the early parallel quest-353 nodes. Only those exact per-subquest shapes are repaired;
+            # any other meaningful predecessor still aborts below.
             obj["acceptCond"] = expected_accept
             predecessor = expected_accept[0]["param"][0]
             changes.append(f"acceptCond={predecessor}:FINISHED")
