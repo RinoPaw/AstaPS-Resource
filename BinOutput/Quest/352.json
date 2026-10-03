@@ -58,6 +58,7 @@
       "mainId": 352
     },
     {
+      "finishCondComb": "LOGIC_OR",
       "finishCond": [
         {
           "param": [
@@ -115,6 +116,8 @@
       "mainId": 352
     },
     {
+      "finishCondComb": "LOGIC_AND",
+      "failCondComb": "LOGIC_OR",
       "failExec": [
         {
           "param": [
