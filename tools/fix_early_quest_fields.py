@@ -47,7 +47,7 @@ def iter_top_level_objects(text: str):
         raise ValueError("Unbalanced JSON object braces")
 
 
-def meaningful_execs(value):
+def meaningful_entries(value):
     if not isinstance(value, list):
         return []
     return [entry for entry in value if isinstance(entry, dict) and entry.get("type")]
@@ -57,10 +57,19 @@ def exec_entry(exec_type: str, params: list[str]) -> dict:
     return {"param": params, "type": exec_type}
 
 
+def state_equal(quest_id: int) -> dict:
+    return {
+        "param": [quest_id, 3, 0],
+        "param_str": "",
+        "type": "QUEST_COND_STATE_EQUAL",
+    }
+
+
+# Evidence source: intact pre-obfuscation GCResource quest data for the same early Mondstadt chain.
+# Only fields that disappeared from the 7.1 conversion are recovered here. Existing meaningful
+# values are never overwritten silently; an unexpected value aborts the patch.
 EXPECTED_BEGIN_EXECS = {
-    # Historical intact quest resource: opening performance locks game time.
     35104: [exec_entry("QUEST_EXEC_SET_IS_GAME_TIME_LOCKED", ["1"])],
-    # Historical intact quest 353 resource. These side effects drive the tutorial group chain.
     35301: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,1"])],
     35302: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,2"])],
     35303: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003448"])],
@@ -70,27 +79,68 @@ EXPECTED_BEGIN_EXECS = {
     ],
 }
 
+EXPECTED_ACCEPT = {
+    35301: [state_equal(35205)],
+    35312: [state_equal(35205)],
+    35302: [state_equal(35301)],
+    35309: [state_equal(35302)],
+    35303: [state_equal(35309)],
+    35310: [state_equal(35303)],
+    35304: [state_equal(35310)],
+    35311: [state_equal(35304)],
+}
+
 EXPECTED_LOGIC = {
-    # 35203 is deliberately gated by BOTH the plot completion and ENTER_REGION_901002.
+    35100: {"finishCondComb": "LOGIC_OR"},
+    35103: {"acceptCondComb": "LOGIC_AND"},
+    35102: {"acceptCondComb": "LOGIC_OR"},
+    35201: {"finishCondComb": "LOGIC_OR"},
+    # The overlook step must wait for BOTH FINISH_PLOT(35203) and trigger 1172
+    # (Scene 3 / group 133003901 / ENTER_REGION_901002).
     35203: {"finishCondComb": "LOGIC_AND", "failCondComb": "LOGIC_OR"},
 }
 
-TARGETS = set(EXPECTED_BEGIN_EXECS) | set(EXPECTED_LOGIC)
+TARGETS = set(EXPECTED_BEGIN_EXECS) | set(EXPECTED_ACCEPT) | set(EXPECTED_LOGIC)
 EXPECTED_MAIN = {
+    35100: 351,
+    35102: 351,
+    35103: 351,
     35104: 351,
+    35201: 352,
     35203: 352,
     35301: 353,
     35302: 353,
     35303: 353,
     35304: 353,
+    35309: 353,
+    35310: 353,
+    35311: 353,
+    35312: 353,
 }
 
 
 def normalized_execs(value):
     return [
         {"type": entry.get("type"), "param": entry.get("param", [])}
-        for entry in meaningful_execs(value)
+        for entry in meaningful_entries(value)
     ]
+
+
+def normalized_accept(value):
+    out = []
+    for entry in meaningful_entries(value):
+        params = entry.get("param", [])
+        if entry.get("type") == "QUEST_COND_STATE_EQUAL" and len(params) >= 2:
+            # Converter variants differ only in whether the unused trailing zero is emitted.
+            params = params[:2]
+        out.append(
+            {
+                "type": entry.get("type"),
+                "param": params,
+                "param_str": entry.get("param_str", entry.get("paramStr", "")) or "",
+            }
+        )
+    return out
 
 
 def patch_record(obj: dict) -> list[str]:
@@ -106,6 +156,22 @@ def patch_record(obj: dict) -> list[str]:
 
     changes: list[str] = []
 
+    expected_accept = EXPECTED_ACCEPT.get(sub_id)
+    if expected_accept is not None:
+        current = normalized_accept(obj.get("acceptCond"))
+        expected = normalized_accept(expected_accept)
+        if current == expected:
+            pass
+        elif not current:
+            obj["acceptCond"] = expected_accept
+            predecessor = expected_accept[0]["param"][0]
+            changes.append(f"acceptCond={predecessor}:FINISHED")
+        else:
+            raise ValueError(
+                f"Quest {sub_id} has unexpected meaningful acceptCond: {current!r}; "
+                f"expected {expected!r}"
+            )
+
     expected_execs = EXPECTED_BEGIN_EXECS.get(sub_id)
     if expected_execs is not None:
         current_execs = normalized_execs(obj.get("beginExec"))
@@ -116,16 +182,16 @@ def patch_record(obj: dict) -> list[str]:
         if current_execs == expected_normalized:
             pass
         elif not current_execs:
-            # Drop converter placeholder entries that have no type. They are filtered by AstaPS
-            # anyway and only obscure the recovered semantic resource.
+            # Drop converter placeholder entries that have no type. AstaPS filters them at load
+            # time, and retaining them only hides the missing semantic execs.
             obj["beginExec"] = expected_execs
             changes.append(
-                "beginExec="
-                + ",".join(entry["type"] for entry in expected_execs)
+                "beginExec=" + ",".join(entry["type"] for entry in expected_execs)
             )
         else:
             raise ValueError(
-                f"Quest {sub_id} has unexpected meaningful beginExec: {current_execs!r}"
+                f"Quest {sub_id} has unexpected meaningful beginExec: {current_execs!r}; "
+                f"expected {expected_normalized!r}"
             )
 
     for field, expected in EXPECTED_LOGIC.get(sub_id, {}).items():
