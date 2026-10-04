@@ -69,6 +69,30 @@ REPAIRS = (
     Repair("1002.json", 1002, 100203, -1, one(100201), (one(100202),)),
     Repair("1002.json", 1002, 100204, -1, one(100202), (one(100203),)),
     Repair("1002.json", 1002, 100205, -1, one(100204), (one(100204),)),
+
+    # MQ1003: one of the three Act I investigation branches.
+    # 100320 is an ACTIVE-state gate (state 2), and 100302/100319 form two
+    # additional fan-outs from 100301 that the flattened chain loses.
+    Repair("1003.json", 1003, 100301, -1, one(100205), (one(0),)),
+    Repair("1003.json", 1003, 100320, -1, one(100301, state=2), (one(100301),)),
+    Repair("1003.json", 1003, 100302, -1, one(100301), (one(100320),)),
+    Repair("1003.json", 1003, 100303, -1, one(100302), (one(100302),)),
+    Repair("1003.json", 1003, 100319, -1, one(100301), (one(100303),)),
+    Repair("1003.json", 1003, 100304, -1, one(100303), (one(100319),)),
+    Repair("1003.json", 1003, 100305, -1, one(100304), (one(100304),)),
+    Repair("1003.json", 1003, 100306, -1, one(100305), (one(100305),)),
+    Repair("1003.json", 1003, 100307, -1, one(100306), (one(100306),)),
+    Repair("1003.json", 1003, 100308, -1, one(100307), (one(100307),)),
+    Repair("1003.json", 1003, 100309, -1, one(100308), (one(100308),)),
+    Repair("1003.json", 1003, 100310, -1, one(100309), (one(100309),)),
+    Repair("1003.json", 1003, 100321, -1, one(100310), (one(100310),)),
+    Repair("1003.json", 1003, 100311, -1, one(100321), (one(100321),)),
+    Repair("1003.json", 1003, 100312, -1, one(100311), (one(100311),)),
+    Repair("1003.json", 1003, 100313, -1, one(100312), (one(100312),)),
+    Repair("1003.json", 1003, 100314, -1, one(100313), (one(100313),)),
+    Repair("1003.json", 1003, 100315, -1, one(100314), (one(100314),)),
+    Repair("1003.json", 1003, 100316, -1, one(100315), (one(100315),)),
+    Repair("1003.json", 1003, 100317, -1, one(100316), (one(100316),)),
 )
 
 
