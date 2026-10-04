@@ -41,6 +41,7 @@ jobs:
             BinOutput/Quest/1018.json
             BinOutput/Quest/1020.json
             BinOutput/Quest/1021.json
+            BinOutput/Quest/1022.json
             ExcelBinOutput/QuestExcelConfigData.json
 
       - uses: actions/setup-python@v5
@@ -56,25 +57,28 @@ jobs:
             tools/fix_liyue_chapter1102.py \
             tools/fix_liyue_chapter1103.py
 
-      - name: Verify repaired Chapter 1102 baseline
+      - name: Verify repaired baseline through MQ1021
         run: |
           python - <<'PY'
           import sys
           from pathlib import Path
 
           sys.path.insert(0, "tools")
-          import fix_liyue_chapter1102 as entry
+          import fix_liyue_chapter1103 as entry
           import fix_liyue_prerequisites as base
 
-          ids = [repair.sub_id for repair in base.REPAIRS]
-          assert len(ids) == 178, f"expected 178 Chapter 1102 repair rows, got {len(ids)}"
-          assert len(ids) == len(set(ids)), "duplicate subId in Chapter 1102 manifest"
+          all_repairs = base.REPAIRS
+          assert len(all_repairs) == 206, f"expected 206 cumulative repair rows, got {len(all_repairs)}"
+          assert len({repair.sub_id for repair in all_repairs}) == len(all_repairs), "duplicate subId in cumulative manifest"
+
+          base.REPAIRS = all_repairs[:-8]
+          assert len(base.REPAIRS) == 198
           assert base.patch_sources(Path("BinOutput/Quest"), check=True) == 0
           assert base.patch_excel(Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True) == 0
-          print("Chapter 1102 prerequisite repair remains clean and idempotent.")
+          print("Prerequisite repair baseline through MQ1021 remains clean and idempotent.")
           PY
 
-      - name: Strict dry-check Chapter 1103 batch
+      - name: Strict dry-check MQ1022 batch
         run: |
           python - <<'PY'
           import sys
@@ -85,7 +89,7 @@ jobs:
           import fix_liyue_prerequisites as base
 
           ids = [repair.sub_id for repair in base.REPAIRS]
-          assert len(ids) == 198, f"expected 198 cumulative repair rows, got {len(ids)}"
+          assert len(ids) == 206, f"expected 206 cumulative repair rows, got {len(ids)}"
           assert len(ids) == len(set(ids)), "duplicate subId in cumulative repair manifest"
 
           source_status = base.patch_sources(Path("BinOutput/Quest"), check=True)
@@ -95,7 +99,7 @@ jobs:
           assert source_status in (0, 1)
           assert excel_status in (0, 1)
           print(
-              "Chapter 1103 strict dry-check completed:",
+              "MQ1022 strict dry-check completed:",
               f"source_pending={bool(source_status)}",
               f"excel_pending={bool(excel_status)}",
           )
