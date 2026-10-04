@@ -19,7 +19,7 @@ def quest_global_var_equal(var_id: int, value: int) -> dict:
 # Liyue Chapter 1103 prerequisite repairs.
 #
 # Evidence:
-# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 through MQ1024.
+# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 through MQ1025.
 # - Current 7.1 BinOutput has lost the subquest acceptCond graph.
 # - The flattened resource synthesizes order-based predecessor edges, corrupting
 #   roots, fan-outs, convergence gates, non-state conditions and independent
@@ -109,6 +109,32 @@ CHAPTER_1103_REPAIRS = (
     Repair("1024.json", 1024, 102405, -1, one(102404), (one(102404),)),
     Repair("1024.json", 1024, 102403, -1, one(99902), (one(0),)),
     Repair("1024.json", 1024, 102406, -1, one(99902), (one(102403),)),
+
+    # MQ1025: Chapter 1103 finale. The first six nodes form the entry chain,
+    # then 102517 fans out to four preparations. 102512 feeds the visible 102505
+    # -> 102506 chain; 102506 then fans out to eight parallel/progress nodes.
+    # The final visible handoff is 102514 -> 102510, the chapter endQuestId.
+    Repair("1025.json", 1025, 102501, -1, one(102405), (one(0),)),
+    Repair("1025.json", 1025, 102516, -1, one(102501), (one(102501),)),
+    Repair("1025.json", 1025, 102515, -1, one(102516), (one(102516),)),
+    Repair("1025.json", 1025, 102521, -1, one(102515), (one(102515),)),
+    Repair("1025.json", 1025, 102502, -1, one(102521), (one(102521),)),
+    Repair("1025.json", 1025, 102517, -1, one(102502), (one(102502),)),
+    Repair("1025.json", 1025, 102503, -1, one(102517), (one(102517),)),
+    Repair("1025.json", 1025, 102504, -1, one(102517), (one(102503),)),
+    Repair("1025.json", 1025, 102511, -1, one(102517), (one(102504),)),
+    Repair("1025.json", 1025, 102512, -1, one(102517), (one(102511),)),
+    Repair("1025.json", 1025, 102505, -1, one(102512), (one(102512),)),
+    Repair("1025.json", 1025, 102506, -1, one(102505), (one(102505),)),
+    Repair("1025.json", 1025, 102507, -1, one(102506), (one(102506),)),
+    Repair("1025.json", 1025, 102508, -1, one(102506), (one(102507),)),
+    Repair("1025.json", 1025, 102509, -1, one(102506), (one(102508),)),
+    Repair("1025.json", 1025, 102518, -1, one(102506), (one(102509),)),
+    Repair("1025.json", 1025, 102519, -1, one(102506), (one(102518),)),
+    Repair("1025.json", 1025, 102520, -1, one(102506), (one(102519),)),
+    Repair("1025.json", 1025, 102513, -1, one(102506), (one(102520),)),
+    Repair("1025.json", 1025, 102514, -1, one(102506), (one(102513),)),
+    Repair("1025.json", 1025, 102510, -1, one(102514), (one(102514),)),
 )
 
 base.REPAIRS += CHAPTER_1103_REPAIRS
