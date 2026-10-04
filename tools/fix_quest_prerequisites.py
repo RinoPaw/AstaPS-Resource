@@ -48,7 +48,9 @@ def one(predecessor: int, *, state: int = FINISHED) -> tuple[dict, ...]:
 # Concrete 7.1 conversion defects recovered from intact historical BinOutput. These rows deliberately
 # cover more than zeroed predecessors: the converter also sequentialized parallel nodes and dropped
 # additional conditions from compound accepts. Every repair names the exact damaged shape observed
-# in the 7.1 dump; an unexpected meaningful condition aborts instead of being overwritten.
+# or the [0, FINISHED] shape produced when the source acceptCond was lost. A negative desc_hash means
+# the quest identity (json_file + main_id + sub_id) is the safety key because text hashes drift by
+# small offsets across resource revisions; the accept-condition shape is still validated strictly.
 REPAIRS = (
     Repair("351.json", 351, 35101, 3236261087, one(35100), (one(35107),)),
     Repair("352.json", 352, 35200, 2150333847, one(35102), (one(0),)),
@@ -104,6 +106,30 @@ REPAIRS = (
     # Hidden trigger 37003 is active while 37005 is UNFINISHED (state 2).
     Repair("370.json", 370, 37003, 411942639, one(37005, state=2), (one(37005),)),
     Repair("371.json", 371, 37101, 3416483463, one(37005), (one(0),)),
+    Repair("372.json", 372, 37201, -1, one(37113), (one(0),)),
+    Repair("373.json", 373, 37301, -1, one(37203), (one(0),)),
+    Repair("374.json", 374, 37408, -1, one(37304), (one(0),)),
+    Repair("375.json", 375, 37501, -1, one(37406), (one(0),)),
+    Repair("376.json", 376, 37601, -1, one(37506), (one(0),)),
+    Repair("377.json", 377, 37701, -1, one(37608), (one(0),)),
+    # The Lisa temple/character-quest bridge remains part of series/chapter 1002.
+    Repair("20101.json", 20101, 2010100, -1, one(37706), (one(0),)),
+    Repair("379.json", 379, 37901, -1, one(2010151), (one(0),)),
+    # Three parallel temple branches all open from 37904.
+    Repair("380.json", 380, 38001, -1, one(37904), (one(0),)),
+    Repair("381.json", 381, 38101, -1, one(37904), (one(0),)),
+    Repair("382.json", 382, 38201, -1, one(37904), (one(0),)),
+    # 38301 is the convergence barrier: all three branches must be finished.
+    Repair(
+        "383.json",
+        383,
+        38301,
+        -1,
+        (state_equal(38004), state_equal(38105), state_equal(38202)),
+        (one(0),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair("384.json", 384, 38401, -1, one(38304), (one(0),)),
 
     # Prologue Act III opening handoff.
     Repair("397.json", 397, 39701, 619581215, one(38406), (one(0),)),
@@ -182,7 +208,7 @@ def identify_repair(obj: dict) -> Repair | None:
             obj.get("json_file") == repair.json_file
             and obj.get("mainId") == repair.main_id
             and obj.get("subId") == repair.sub_id
-            and obj.get("descTextMapHash") == repair.desc_hash
+            and (repair.desc_hash < 0 or obj.get("descTextMapHash") == repair.desc_hash)
         ):
             return repair
     return None
