@@ -104,10 +104,12 @@ EXPECTED_ACCEPT = {
 # Exact converter-damaged variants observed in the 7.1 dump. Keep these per-subquest instead of
 # accepting arbitrary alternative predecessors: 35312 was serialized as a sequential successor of
 # 35301 even though the intact graph starts both from 35205; some dumps then serialize 35302 after
-# 35312 for the same reason.
+# 35312 for the same reason. Forest Rendezvous 35502 can retain only the visible 35501 predecessor
+# while dropping both hidden 36101 prerequisites.
 KNOWN_DAMAGED_ACCEPT = {
     35312: [[state_equal(35301)]],
     35302: [[state_equal(35312)]],
+    35502: [[state_equal(35501)]],
 }
 
 EXPECTED_LOGIC = {
