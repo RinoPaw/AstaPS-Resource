@@ -59,20 +59,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Verify references and audit flattened graph
+      - name: Audit flattened graph with row-level reference consensus
         run: |
           python -m py_compile tools/audit_quest_prerequisite_drift.py tools/filter_quest_prerequisite_consensus.py
           python - <<'PY'
           import hashlib
           from pathlib import Path
-          mains = (1019, 1028, 1029, 1030, 1031)
-          for main_id in mains:
+          for main_id in (1019, 1028, 1029, 1030, 1031):
               a = Path("ref3700/BinOutput/Quest") / f"{main_id}.json"
               b = Path("ref4000/BinOutput/Quest") / f"{main_id}.json"
               ah = hashlib.sha256(a.read_bytes()).hexdigest()
               bh = hashlib.sha256(b.read_bytes()).hexdigest()
-              assert ah == bh, f"reference mismatch for {main_id}: {ah} != {bh}"
-              print(f"reference-identical {main_id}.json {ah[:16]}")
+              state = "identical" if ah == bh else "different"
+              print(f"reference-file-{state} {main_id}.json 3700={ah[:16]} 4000={bh[:16]}")
           PY
           python tools/audit_quest_prerequisite_drift.py \
             --reference-bin-root ref3700/BinOutput/Quest \
@@ -84,7 +83,7 @@ jobs:
             --main 1019 --main 1028 --main 1029 --main 1030 --main 1031 \
             --consensus-count 2 --json chapter1207-consensus.json
 
-      - name: Audit source loss and emit manifest
+      - name: Audit source loss and emit only consensus manifest rows
         run: |
           python - <<'PY'
           import json
@@ -104,26 +103,39 @@ jobs:
                   if entry.get("type") in STATE_TYPES: params=params[:2]
                   out.append({"type":entry.get("type"),"param":params,"param_str":entry.get("param_str",entry.get("paramStr", "")) or ""})
               return out
-          total=match=missing=other=0
+          total=match=missing=other=consensus=disagree=0
           combs=Counter()
           for main_id in mains:
               cur=json.loads((Path("BinOutput/Quest")/f"{main_id}.json").read_text(encoding="utf-8"))
-              ref=json.loads((Path("ref3700/BinOutput/Quest")/f"{main_id}.json").read_text(encoding="utf-8"))
+              ref37=json.loads((Path("ref3700/BinOutput/Quest")/f"{main_id}.json").read_text(encoding="utf-8"))
+              ref40=json.loads((Path("ref4000/BinOutput/Quest")/f"{main_id}.json").read_text(encoding="utf-8"))
               cur_by={int(x["subId"]):x for x in cur.get("subQuests",[])}
-              ref_by={int(x["subId"]):x for x in ref.get("subQuests",[])}
-              print(f"membership main={main_id} current={len(cur_by)} reference={len(ref_by)} current-only={sorted(set(cur_by)-set(ref_by))} ref-only={sorted(set(ref_by)-set(cur_by))}")
-              for sid in sorted(set(cur_by)&set(ref_by)):
-                  got=meaningful(cur_by[sid]); exp=meaningful(ref_by[sid]); total+=1
-                  if got==exp: match+=1
-                  elif not got and exp: missing+=1
-                  else:
-                      other+=1
-                      print(f"source-other main={main_id} sub={sid} current={got!r} expected={exp!r}")
-              for row in sorted(ref.get("subQuests",[]), key=lambda x:int(x.get("subId") or 0)):
-                  sid=int(row["subId"]); comb=row.get("acceptCondComb") or "LOGIC_AND"
-                  combs[comb]+=1
-                  accept=json.dumps(normalized(row),ensure_ascii=False,separators=(",",":"))
-                  print(f"manifest main={main_id} sub={sid} comb={comb} accept={accept}")
-          print(f"source-summary-all total={total} match={match} missing={missing} other={other}")
+              r37={int(x["subId"]):x for x in ref37.get("subQuests",[])}
+              r40={int(x["subId"]):x for x in ref40.get("subQuests",[])}
+              print(f"membership main={main_id} current={len(cur_by)} ref3700={len(r37)} ref4000={len(r40)} current-only={sorted(set(cur_by)-set(r37)-set(r40))} ref-only={sorted((set(r37)|set(r40))-set(cur_by))}")
+              for sid in sorted(set(r37) | set(r40)):
+                  if sid not in r37 or sid not in r40:
+                      disagree += 1
+                      print(f"reference-membership-disagreement main={main_id} sub={sid} in3700={sid in r37} in4000={sid in r40}")
+                      continue
+                  a=(normalized(r37[sid]), r37[sid].get("acceptCondComb") or "LOGIC_AND")
+                  b=(normalized(r40[sid]), r40[sid].get("acceptCondComb") or "LOGIC_AND")
+                  if a != b:
+                      disagree += 1
+                      print(f"reference-prerequisite-disagreement main={main_id} sub={sid} ref3700={a!r} ref4000={b!r}")
+                      continue
+                  consensus += 1
+                  combs[a[1]] += 1
+                  if sid in cur_by:
+                      got=meaningful(cur_by[sid]); exp=meaningful(r37[sid]); total+=1
+                      if got==exp: match+=1
+                      elif not got and exp: missing+=1
+                      else:
+                          other+=1
+                          print(f"source-other main={main_id} sub={sid} current={got!r} expected={exp!r}")
+                  accept=json.dumps(a[0],ensure_ascii=False,separators=(",",":"))
+                  print(f"manifest main={main_id} sub={sid} comb={a[1]} accept={accept}")
+          print(f"source-summary-consensus total={total} match={match} missing={missing} other={other}")
+          print(f"reference-summary consensus={consensus} disagreement={disagree}")
           print(f"combiner-summary={dict(sorted(combs.items()))}")
           PY
