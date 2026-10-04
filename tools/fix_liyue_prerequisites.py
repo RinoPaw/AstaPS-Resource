@@ -14,7 +14,6 @@ from fix_quest_prerequisites import (
     normalized_variant,
     one,
     patch_object,
-    render_object,
 )
 
 DEFAULT_SOURCE_ROOT = Path("BinOutput/Quest")
@@ -23,11 +22,13 @@ DEFAULT_EXCEL_PATH = Path("ExcelBinOutput/QuestExcelConfigData.json")
 # Early Liyue / post-Prologue prerequisite repairs.
 #
 # Evidence:
-# - GCResource 3.7 and 4.0 have byte-identical 400.json and 1000.json quest sources.
+# - GCResource 3.7 and 4.0 agree on the normalized prerequisite graphs below.
 # - Current 7.1 BinOutput lost acceptCond for these rows.
-# - Current flattened QuestExcelConfigData serializes the missing graph as order-based chains.
+# - Current flattened QuestExcelConfigData serializes many missing fan-out edges as
+#   order-based chains.
 #
-# Keep this batch separate from the Prologue manifest until the wider Liyue graph audit is complete.
+# Keep this batch separate from the Prologue manifest until the wider Liyue graph
+# audit is complete.
 REPAIRS = (
     # Post-Prologue hidden bridge.
     Repair("400.json", 400, 40001, -1, one(39604), (one(0),)),
@@ -59,6 +60,15 @@ REPAIRS = (
     Repair("1000.json", 1000, 100012, -1, one(100010), (one(100011),)),
     Repair("1000.json", 1000, 100013, -1, one(100012), (one(100012),)),
     Repair("1000.json", 1000, 100014, -1, one(100013), (one(100013),)),
+
+    # MQ1002: common entry before the three Act I investigation branches.
+    # Historical graph fans both 100202 and 100203 out from 100201; current
+    # flattened data incorrectly serializes 100203 -> 100202 -> 100204.
+    Repair("1002.json", 1002, 100201, -1, one(100014), (one(0),)),
+    Repair("1002.json", 1002, 100202, -1, one(100201), (one(100201),)),
+    Repair("1002.json", 1002, 100203, -1, one(100201), (one(100202),)),
+    Repair("1002.json", 1002, 100204, -1, one(100202), (one(100203),)),
+    Repair("1002.json", 1002, 100205, -1, one(100204), (one(100204),)),
 )
 
 
