@@ -5,13 +5,25 @@ import fix_liyue_chapter1102  # noqa: F401 - extends the shared manifest on impo
 import fix_liyue_prerequisites as base
 from fix_quest_prerequisites import Repair, one, state_equal
 
+QUEST_GLOBAL_VAR_EQUAL = "QUEST_COND_QUEST_GLOBAL_VAR_EQUAL"
+
+
+def quest_global_var_equal(var_id: int, value: int) -> dict:
+    return {
+        "type": QUEST_GLOBAL_VAR_EQUAL,
+        "param": [var_id, value, 0],
+        "param_str": "",
+    }
+
+
 # Liyue Chapter 1103 prerequisite repairs.
 #
 # Evidence:
-# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 through MQ1023.
+# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 through MQ1024.
 # - Current 7.1 BinOutput has lost the subquest acceptCond graph.
 # - The flattened resource synthesizes order-based predecessor edges, corrupting
-#   roots, fan-outs, convergence gates and independent 99902 controllers.
+#   roots, fan-outs, convergence gates, non-state conditions and independent
+#   99902 controllers.
 CHAPTER_1103_REPAIRS = (
     # MQ1020: Chapter 1103 entry. Historical graph is linear; source still needs
     # full restoration while only the root is semantically wrong after flattening.
@@ -70,6 +82,33 @@ CHAPTER_1103_REPAIRS = (
     Repair("1023.json", 1023, 102305, -1, one(102304), (one(102304),)),
     Repair("1023.json", 1023, 102306, -1, one(99902), (one(102305),)),
     Repair("1023.json", 1023, 102307, -1, one(99902), (one(102306),)),
+
+    # MQ1024: dungeon retry state machine. Two roots are driven by quest-global
+    # variable 10009 rather than another subquest, and 102403/102406 are hidden
+    # 99902 controllers. The 7.1 source moves those controllers to orders 98/99
+    # after losing acceptCond; the historical prerequisite semantics remain clear.
+    Repair(
+        "1024.json",
+        1024,
+        102407,
+        -1,
+        (quest_global_var_equal(10009, 2),),
+        (one(0),),
+    ),
+    Repair("1024.json", 1024, 102408, -1, one(102407), (one(102407),)),
+    Repair(
+        "1024.json",
+        1024,
+        102401,
+        -1,
+        (quest_global_var_equal(10009, 1),),
+        (one(102408),),
+    ),
+    Repair("1024.json", 1024, 102402, -1, one(102401), (one(102401),)),
+    Repair("1024.json", 1024, 102404, -1, one(102402), (one(102402),)),
+    Repair("1024.json", 1024, 102405, -1, one(102404), (one(102404),)),
+    Repair("1024.json", 1024, 102403, -1, one(99902), (one(102405),)),
+    Repair("1024.json", 1024, 102406, -1, one(99902), (one(102403),)),
 )
 
 base.REPAIRS += CHAPTER_1103_REPAIRS
