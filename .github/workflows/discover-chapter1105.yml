@@ -1,4 +1,4 @@
-name: Discover Chapter 1105 quest scope
+name: Discover Chapter 1105 prerequisite drift
 
 on:
   push:
@@ -11,51 +11,102 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout current Chapter 1105 subset
+        uses: actions/checkout@v4
         with:
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
-            ExcelBinOutput/ChapterExcelConfigData.json
-            ExcelBinOutput/MainQuestExcelConfigData.json
+            tools
+            BinOutput/Quest/18000.json
             ExcelBinOutput/QuestExcelConfigData.json
+            ExcelBinOutput/ChapterExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/18000.json
+
+      - name: Checkout GCResource 4.0 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/18000.json
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Inspect Chapter 1105 scope
+      - name: Verify historical identity
+        run: |
+          python -m py_compile tools/audit_quest_prerequisite_drift.py tools/filter_quest_prerequisite_consensus.py
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          a = Path("ref3700/BinOutput/Quest/18000.json")
+          b = Path("ref4000/BinOutput/Quest/18000.json")
+          ah = hashlib.sha256(a.read_bytes()).hexdigest()
+          bh = hashlib.sha256(b.read_bytes()).hexdigest()
+          print(f"reference 3700={ah}")
+          print(f"reference 4000={bh}")
+          assert ah == bh, f"Chapter 1105 references disagree at file level: {ah} != {bh}"
+          PY
+
+      - name: Audit flattened prerequisite graph
+        run: |
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 18000 \
+            --only-differences \
+            --json chapter1105-audit.json
+
+          python tools/filter_quest_prerequisite_consensus.py \
+            chapter1105-audit.json \
+            --main 18000 \
+            --consensus-count 2 \
+            --json chapter1105-consensus.json
+
+      - name: Audit current BinOutput source loss
         run: |
           python - <<'PY'
           import json
-          from collections import Counter, defaultdict
           from pathlib import Path
 
-          chapter = json.loads(Path("ExcelBinOutput/ChapterExcelConfigData.json").read_text(encoding="utf-8"))
-          main = json.loads(Path("ExcelBinOutput/MainQuestExcelConfigData.json").read_text(encoding="utf-8"))
-          quest = json.loads(Path("ExcelBinOutput/QuestExcelConfigData.json").read_text(encoding="utf-8"))
+          def meaningful(row):
+              value = row.get("acceptCond")
+              if not isinstance(value, list):
+                  return []
+              return [x for x in value if isinstance(x, dict) and x.get("type")]
 
-          for cid in (1104, 1105, 1106):
-              rows = [x for x in chapter if int(x.get("id") or 0) == cid]
-              print(f"chapter {cid}: {json.dumps(rows, ensure_ascii=False, sort_keys=True)}")
+          cur = json.loads(Path("BinOutput/Quest/18000.json").read_text(encoding="utf-8"))
+          ref = json.loads(Path("ref3700/BinOutput/Quest/18000.json").read_text(encoding="utf-8"))
+          cur_by_id = {int(x["subId"]): x for x in cur.get("subQuests", [])}
+          ref_by_id = {int(x["subId"]): x for x in ref.get("subQuests", [])}
+          print(f"current-subquests={len(cur_by_id)} reference-subquests={len(ref_by_id)}")
+          assert set(cur_by_id) == set(ref_by_id), f"subquest membership drift current-only={sorted(set(cur_by_id)-set(ref_by_id))} ref-only={sorted(set(ref_by_id)-set(cur_by_id))}"
 
-          mains = [x for x in main if int(x.get("chapterId") or 0) == 1105]
-          print(f"chapter1105-main-count={len(mains)}")
-          for row in mains:
-              print("main", json.dumps({
-                  "id": row.get("id"),
-                  "chapterId": row.get("chapterId"),
-                  "luaPath": row.get("luaPath"),
-                  "series": row.get("series"),
-                  "type": row.get("type"),
-                  "suggestTrackMainQuestList": row.get("suggestTrackMainQuestList"),
-              }, ensure_ascii=False, sort_keys=True))
-
-          main_ids = {int(x.get("id") or 0) for x in mains}
-          qrows = [x for x in quest if int(x.get("mainId") or 0) in main_ids]
-          counts = Counter(int(x.get("mainId") or 0) for x in qrows)
-          print(f"chapter1105-flattened-total={len(qrows)} counts={dict(sorted(counts.items()))}")
-          for mid in sorted(main_ids):
-              subs = sorted(int(x.get("subId") or 0) for x in qrows if int(x.get("mainId") or 0) == mid)
-              print(f"flattened main={mid} count={len(subs)} subs={subs}")
+          match = missing = other = 0
+          for sid in sorted(ref_by_id):
+              got = meaningful(cur_by_id[sid])
+              exp = meaningful(ref_by_id[sid])
+              if got == exp:
+                  match += 1
+              elif not got and exp:
+                  missing += 1
+              else:
+                  other += 1
+                  print(f"source-other sub={sid} current={got!r} expected={exp!r}")
+          print(f"source-summary total={len(ref_by_id)} match={match} missing={missing} other={other}")
           PY
