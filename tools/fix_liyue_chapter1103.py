@@ -8,7 +8,7 @@ from fix_quest_prerequisites import Repair, one, state_equal
 # Liyue Chapter 1103 prerequisite repairs.
 #
 # Evidence:
-# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 and MQ1021.
+# - GCResource 3.7 and 4.0 are byte-identical for MQ1020, MQ1021 and MQ1022.
 # - Current 7.1 BinOutput has lost the subquest acceptCond graph.
 # - The flattened resource synthesizes order-based predecessor edges, corrupting
 #   roots, fan-outs and the three-way convergence gate in MQ1021.
@@ -47,6 +47,18 @@ CHAPTER_1103_REPAIRS = (
     Repair("1021.json", 1021, 102105, -1, one(102113), (one(102113),)),
     Repair("1021.json", 1021, 102106, -1, one(102105), (one(102105),)),
     Repair("1021.json", 1021, 102112, -1, one(102106), (one(102106),)),
+
+    # MQ1022: eight-node linear continuation. Flattening preserves the internal
+    # predecessor chain but loses the true chapter-to-chapter root edge in QuestExcel,
+    # while current BinOutput has no subquest acceptCond at all.
+    Repair("1022.json", 1022, 102201, -1, one(102112), (one(0),)),
+    Repair("1022.json", 1022, 102202, -1, one(102201), (one(102201),)),
+    Repair("1022.json", 1022, 102203, -1, one(102202), (one(102202),)),
+    Repair("1022.json", 1022, 102204, -1, one(102203), (one(102203),)),
+    Repair("1022.json", 1022, 102205, -1, one(102204), (one(102204),)),
+    Repair("1022.json", 1022, 102206, -1, one(102205), (one(102205),)),
+    Repair("1022.json", 1022, 102207, -1, one(102206), (one(102206),)),
+    Repair("1022.json", 1022, 102208, -1, one(102207), (one(102207),)),
 )
 
 base.REPAIRS += CHAPTER_1103_REPAIRS
