@@ -101,6 +101,17 @@ def load_reference_row(
     return None, str(path)
 
 
+def load_reference_main(root: Path, main_id: int) -> tuple[list[dict], str | None]:
+    path = reference_file(root, "", main_id)
+    if path is None:
+        return [], None
+    try:
+        document = load_json(path)
+    except (OSError, json.JSONDecodeError):
+        return [], str(path)
+    return list(iter_subquests(document)), str(path)
+
+
 def is_zero_finished(conditions: list[dict]) -> bool:
     if len(conditions) != 1:
         return False
@@ -170,6 +181,14 @@ def main() -> int:
         default=[],
         help="Limit output to one main quest id. Repeat to select multiple main quests.",
     )
+    parser.add_argument(
+        "--include-reference-only",
+        action="store_true",
+        help=(
+            "For explicitly selected --main quests, also report historical consensus subquests that "
+            "are completely absent from the flattened QuestExcel resource."
+        ),
+    )
     parser.add_argument("--only-differences", action="store_true")
     parser.add_argument("--json", dest="json_output", type=Path, default=None)
     args = parser.parse_args()
@@ -179,12 +198,16 @@ def main() -> int:
         raise SystemExit(f"{args.quest_excel} must contain a top-level JSON array")
 
     selected_main_ids = set(args.main_ids)
+    if args.include_reference_only and not selected_main_ids:
+        raise SystemExit("--include-reference-only requires at least one explicit --main")
+
     chapter_begins = chapter_begin_ids(args.chapter_excel)
     counts: Counter[str] = Counter()
     report: list[dict] = []
     missing_all_references = 0
     partial_reference_coverage = 0
     reference_disagreements = 0
+    current_keys: set[tuple[int, int]] = set()
 
     for row in root:
         if not isinstance(row, dict):
@@ -193,6 +216,7 @@ def main() -> int:
         sub_id = int(row.get("subId") or 0)
         if selected_main_ids and main_id not in selected_main_ids:
             continue
+        current_keys.add((main_id, sub_id))
 
         json_file = str(row.get("json_file") or "")
         reference_entries: list[tuple[dict, str, str]] = []
@@ -273,6 +297,93 @@ def main() -> int:
             }
         )
 
+    if args.include_reference_only:
+        for main_id in sorted(selected_main_ids):
+            rows_by_root: list[tuple[dict[int, dict], str, str]] = []
+            for reference_root in args.reference_bin_root:
+                rows, source = load_reference_main(reference_root, main_id)
+                rows_by_root.append(
+                    (
+                        {int(row.get("subId") or 0): row for row in rows},
+                        source or "",
+                        str(reference_root),
+                    )
+                )
+
+            all_sub_ids = sorted({sid for rows, _, _ in rows_by_root for sid in rows if sid > 0})
+            for sub_id in all_sub_ids:
+                if (main_id, sub_id) in current_keys:
+                    continue
+
+                reference_entries: list[tuple[dict, str, str]] = []
+                missing_roots: list[str] = []
+                for rows, source, root_name in rows_by_root:
+                    row = rows.get(sub_id)
+                    if row is None:
+                        missing_roots.append(root_name)
+                    else:
+                        reference_entries.append((row, source, root_name))
+
+                if not reference_entries:
+                    missing_all_references += 1
+                    continue
+                if missing_roots:
+                    partial_reference_coverage += 1
+
+                signatures: dict[tuple[str, str], list[tuple[dict, str, str]]] = {}
+                for entry in reference_entries:
+                    signatures.setdefault(reference_signature(entry[0]), []).append(entry)
+
+                reference_row = reference_entries[0][0]
+                if len(signatures) != 1:
+                    reference_disagreements += 1
+                    counts["reference-disagreement"] += 1
+                    report.append(
+                        {
+                            "classification": "reference-disagreement",
+                            "json_file": f"{main_id}.json",
+                            "main_id": main_id,
+                            "sub_id": sub_id,
+                            "order": int(reference_row.get("order") or 0),
+                            "show_type": str(reference_row.get("showType") or ""),
+                            "chapter_begin": sub_id in chapter_begins,
+                            "current_accept": [],
+                            "current_comb": "LOGIC_AND",
+                            "reference_variants": [
+                                {
+                                    "accept": normalize_accept(ref_row.get("acceptCond")),
+                                    "comb": normalize_comb(ref_row),
+                                    "source": source,
+                                    "root": ref_root,
+                                }
+                                for ref_row, source, ref_root in reference_entries
+                            ],
+                            "missing_reference_roots": missing_roots,
+                        }
+                    )
+                    continue
+
+                counts["current-missing-row"] += 1
+                report.append(
+                    {
+                        "classification": "current-missing-row",
+                        "json_file": f"{main_id}.json",
+                        "main_id": main_id,
+                        "sub_id": sub_id,
+                        "order": int(reference_row.get("order") or 0),
+                        "show_type": str(reference_row.get("showType") or ""),
+                        "chapter_begin": sub_id in chapter_begins,
+                        "current_accept": [],
+                        "reference_accept": normalize_accept(reference_row.get("acceptCond")),
+                        "current_comb": "LOGIC_AND",
+                        "reference_comb": normalize_comb(reference_row),
+                        "reference_sources": [entry[1] for entry in reference_entries],
+                        "reference_roots": [entry[2] for entry in reference_entries],
+                        "missing_reference_roots": missing_roots,
+                        "reference_consensus_count": len(reference_entries),
+                    }
+                )
+
     print("Quest prerequisite drift audit")
     print(f"  reference roots: {len(args.reference_bin_root)}")
     if selected_main_ids:
@@ -283,6 +394,7 @@ def main() -> int:
     print(f"  reference-disagreement: {reference_disagreements}")
     for name in (
         "match",
+        "current-missing-row",
         "zeroed-predecessor",
         "missing-accept",
         "predecessor-drift",
@@ -345,6 +457,7 @@ def main() -> int:
                 {
                     "reference_roots": [str(root) for root in args.reference_bin_root],
                     "main_ids": sorted(selected_main_ids),
+                    "include_reference_only": args.include_reference_only,
                     "counts": dict(counts),
                     "reference_missing_all": missing_all_references,
                     "partial_reference_coverage": partial_reference_coverage,
