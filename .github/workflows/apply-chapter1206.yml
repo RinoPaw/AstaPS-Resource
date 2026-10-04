@@ -1,0 +1,133 @@
+name: Validate and apply Chapter 1206 row restoration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-chapter1206.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Chapter 1206 repair subset
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+            BinOutput/Quest/8004.json
+            BinOutput/Quest/8005.json
+            BinOutput/Quest/8006.json
+            BinOutput/Quest/8007.json
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8004.json
+            BinOutput/Quest/8005.json
+            BinOutput/Quest/8006.json
+            BinOutput/Quest/8007.json
+
+      - name: Checkout GCResource 4.0 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8004.json
+            BinOutput/Quest/8005.json
+            BinOutput/Quest/8006.json
+            BinOutput/Quest/8007.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate historical consensus and exact missing-row state
+        run: |
+          python -m py_compile \
+            tools/fix_quest_prerequisites.py \
+            tools/fix_liyue_prerequisites.py \
+            tools/fix_liyue_chapter1205.py \
+            tools/fix_chapter1206_quest_rows.py \
+            tools/audit_quest_prerequisite_drift.py
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          for main_id in (8004, 8005, 8006, 8007):
+              a = Path("ref3700/BinOutput/Quest") / f"{main_id}.json"
+              b = Path("ref4000/BinOutput/Quest") / f"{main_id}.json"
+              assert hashlib.sha256(a.read_bytes()).digest() == hashlib.sha256(b.read_bytes()).digest(), main_id
+          print("Chapter 1206 references are byte-identical across 3.7 and 4.0.")
+          PY
+          set +e
+          python tools/fix_chapter1206_quest_rows.py --check
+          status=$?
+          set -e
+          test "$status" -eq 1
+
+      - name: Apply and verify Chapter 1206 restoration
+        run: |
+          python tools/fix_chapter1206_quest_rows.py
+          python tools/fix_chapter1206_quest_rows.py --check
+          git diff --check
+          python - <<'PY'
+          import subprocess
+          allowed = {
+              "BinOutput/Quest/8004.json",
+              "BinOutput/Quest/8005.json",
+              "BinOutput/Quest/8006.json",
+              "BinOutput/Quest/8007.json",
+              "ExcelBinOutput/QuestExcelConfigData.json",
+          }
+          changed = set(subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines())
+          if changed != allowed:
+              raise SystemExit(f"expected exactly {sorted(allowed)}, got {sorted(changed)}")
+          print("validated Chapter 1206 modified path allowlist")
+          PY
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 8004 --main 8005 --main 8006 --main 8007 \
+            --include-reference-only --only-differences --json chapter1206-after-repair.json
+          python - <<'PY'
+          import json
+          report = json.load(open("chapter1206-after-repair.json", encoding="utf-8"))
+          diffs = [row for row in report["rows"] if row["classification"] != "match"]
+          if diffs:
+              raise SystemExit(f"Chapter 1206 still has prerequisite differences: {diffs}")
+          if report["counts"].get("match") != 53:
+              raise SystemExit(f"expected 53 consensus matches, got {report['counts']}")
+          if report["reference_disagreements"] or report["partial_reference_coverage"]:
+              raise SystemExit(f"reference coverage is not clean: {report}")
+          print("PASS: Chapter 1206 prerequisite graph = 53/53 historical consensus")
+          PY
+
+      - name: Commit repaired resources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            BinOutput/Quest/8004.json \
+            BinOutput/Quest/8005.json \
+            BinOutput/Quest/8006.json \
+            BinOutput/Quest/8007.json \
+            ExcelBinOutput/QuestExcelConfigData.json
+          git commit -m "fix: restore Chapter 1206 quest rows and prerequisites [skip ci]"
+          git push origin HEAD:main
