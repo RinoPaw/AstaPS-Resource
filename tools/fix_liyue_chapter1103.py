@@ -8,10 +8,10 @@ from fix_quest_prerequisites import Repair, one, state_equal
 # Liyue Chapter 1103 prerequisite repairs.
 #
 # Evidence:
-# - GCResource 3.7 and 4.0 are byte-identical for MQ1020, MQ1021 and MQ1022.
+# - GCResource 3.7 and 4.0 are byte-identical for MQ1020 through MQ1023.
 # - Current 7.1 BinOutput has lost the subquest acceptCond graph.
 # - The flattened resource synthesizes order-based predecessor edges, corrupting
-#   roots, fan-outs and the three-way convergence gate in MQ1021.
+#   roots, fan-outs, convergence gates and independent 99902 controllers.
 CHAPTER_1103_REPAIRS = (
     # MQ1020: Chapter 1103 entry. Historical graph is linear; source still needs
     # full restoration while only the root is semantically wrong after flattening.
@@ -59,6 +59,17 @@ CHAPTER_1103_REPAIRS = (
     Repair("1022.json", 1022, 102206, -1, one(102205), (one(102205),)),
     Repair("1022.json", 1022, 102207, -1, one(102206), (one(102206),)),
     Repair("1022.json", 1022, 102208, -1, one(102207), (one(102207),)),
+
+    # MQ1023: dungeon chain followed by two independent hidden controllers.
+    # 102306 and 102307 are both historically rooted at 99902 and must not be
+    # serialized as continuations of the visible dungeon sequence.
+    Repair("1023.json", 1023, 102301, -1, one(102208), (one(0),)),
+    Repair("1023.json", 1023, 102303, -1, one(102301), (one(102301),)),
+    Repair("1023.json", 1023, 102302, -1, one(102303), (one(102303),)),
+    Repair("1023.json", 1023, 102304, -1, one(102302), (one(102302),)),
+    Repair("1023.json", 1023, 102305, -1, one(102304), (one(102304),)),
+    Repair("1023.json", 1023, 102306, -1, one(99902), (one(102305),)),
+    Repair("1023.json", 1023, 102307, -1, one(99902), (one(102306),)),
 )
 
 base.REPAIRS += CHAPTER_1103_REPAIRS
