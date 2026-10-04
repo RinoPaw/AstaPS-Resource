@@ -10,6 +10,7 @@ on:
       - "tools/fix_liyue_chapter1102.py"
       - "tools/fix_liyue_chapter1103.py"
       - "tools/fix_chapter1104_quest_rows.py"
+      - "tools/fix_liyue_chapter1105.py"
       - "BinOutput/Quest/**.json"
       - "ExcelBinOutput/QuestExcelConfigData.json"
       - ".github/workflows/quest-prerequisite-audit.yml"
@@ -50,6 +51,7 @@ jobs:
             BinOutput/Quest/8001.json
             BinOutput/Quest/8002.json
             BinOutput/Quest/8003.json
+            BinOutput/Quest/18000.json
             ExcelBinOutput/QuestExcelConfigData.json
 
       - uses: actions/setup-python@v5
@@ -64,24 +66,25 @@ jobs:
             tools/fix_liyue_act1_branches.py \
             tools/fix_liyue_chapter1102.py \
             tools/fix_liyue_chapter1103.py \
-            tools/fix_chapter1104_quest_rows.py
+            tools/fix_chapter1104_quest_rows.py \
+            tools/fix_liyue_chapter1105.py
 
-      - name: Verify repaired prerequisite graph through Chapter 1103
+      - name: Verify repaired prerequisite graph through Chapter 1105
         run: |
           python - <<'PY'
           import sys
           from pathlib import Path
 
           sys.path.insert(0, "tools")
-          import fix_liyue_chapter1103 as entry
+          import fix_liyue_chapter1105 as entry
           import fix_liyue_prerequisites as base
 
           ids = [repair.sub_id for repair in base.REPAIRS]
-          assert len(ids) == 242, f"expected 242 cumulative repair rows, got {len(ids)}"
+          assert len(ids) == 271, f"expected 271 cumulative repair rows, got {len(ids)}"
           assert len(ids) == len(set(ids)), "duplicate subId in cumulative repair manifest"
           assert base.patch_sources(Path("BinOutput/Quest"), check=True) == 0
           assert base.patch_excel(Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True) == 0
-          print("Prerequisite graph through Chapter 1103 is clean and idempotent.")
+          print("Cumulative prerequisite graph through Chapter 1105 is clean and idempotent.")
           PY
 
       - name: Verify Chapter 1104 quest rows and prerequisites
