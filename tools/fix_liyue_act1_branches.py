@@ -177,6 +177,25 @@ BRANCH_REPAIRS = (
     Repair("1011.json", 1011, 101107, -1, one(101127), (one(101111),)),
     Repair("1011.json", 1011, 101108, -1, one(101107), (one(101107),)),
     Repair("1011.json", 1011, 101109, -1, one(101108), (one(101108),)),
+
+    # MQ1012: Chapter 1102 purchase / collection sequence.
+    # Orders 9-13 are five siblings that all fan out from 101214. The flattened
+    # order chain incorrectly serializes them as a linear collection sequence.
+    Repair("1012.json", 1012, 101202, -1, one(101109), (one(0),)),
+    Repair("1012.json", 1012, 101212, -1, one(101202), (one(101202),)),
+    Repair("1012.json", 1012, 101203, -1, one(101212), (one(101212),)),
+    Repair("1012.json", 1012, 101204, -1, one(101203), (one(101203),)),
+    Repair("1012.json", 1012, 101205, -1, one(101204), (one(101204),)),
+    Repair("1012.json", 1012, 101213, -1, one(101205), (one(101205),)),
+    Repair("1012.json", 1012, 101206, -1, one(101213), (one(101213),)),
+    Repair("1012.json", 1012, 101214, -1, one(101206), (one(101206),)),
+    Repair("1012.json", 1012, 101210, -1, one(101214), (one(101214),)),
+    Repair("1012.json", 1012, 101211, -1, one(101214), (one(101210),)),
+    Repair("1012.json", 1012, 101207, -1, one(101214), (one(101211),)),
+    Repair("1012.json", 1012, 101208, -1, one(101214), (one(101207),)),
+    Repair("1012.json", 1012, 101201, -1, one(101214), (one(101208),)),
+    Repair("1012.json", 1012, 101215, -1, one(101210), (one(101201),)),
+    Repair("1012.json", 1012, 101209, -1, one(101215), (one(101215),)),
 )
 
 base.REPAIRS += BRANCH_REPAIRS
