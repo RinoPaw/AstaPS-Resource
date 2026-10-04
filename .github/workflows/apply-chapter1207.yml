@@ -1,0 +1,305 @@
+name: Validate and apply Chapter 1207 prerequisite restoration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-chapter1207.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Chapter 1207 repair subset
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1028.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/1031.json
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1028.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/1031.json
+
+      - name: Checkout GCResource 4.0 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1028.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/1031.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate strict Chapter 1207 manifest from dual-reference consensus
+        run: |
+          python - <<'PY'
+          import json
+          import pprint
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, "tools")
+          from fix_quest_prerequisites import normalize_accept
+
+          STATE_TYPES = {"QUEST_COND_STATE_EQUAL", "QUEST_COND_STATE_NOT_EQUAL"}
+          mains = (1019, 1028, 1029, 1030, 1031)
+          expected_total = 88
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding="utf-8"))
+
+          def effective_comb(row):
+              return row.get("acceptCondComb") or "LOGIC_AND"
+
+          def canonical(entries):
+              out = []
+              for entry in entries:
+                  item = dict(entry)
+                  params = list(item.get("param") or [])
+                  if item.get("type") in STATE_TYPES and len(params) == 2:
+                      params.append(0)
+                  item["param"] = params
+                  item["param_str"] = item.get("param_str", "") or ""
+                  out.append(item)
+              return out
+
+          excel = load("ExcelBinOutput/QuestExcelConfigData.json")
+          excel_by = {}
+          for row in excel:
+              if not isinstance(row, dict):
+                  continue
+              sid = int(row.get("subId") or 0)
+              if sid <= 0:
+                  continue
+              if sid in excel_by:
+                  excel_by[sid] = None
+              else:
+                  excel_by[sid] = row
+
+          rows = []
+          source_missing = 0
+          excel_accept_drift = 0
+          comb_drift = 0
+          ref_disagreement = 0
+
+          for main_id in mains:
+              cur = load(f"BinOutput/Quest/{main_id}.json")
+              ref37 = load(f"ref3700/BinOutput/Quest/{main_id}.json")
+              ref40 = load(f"ref4000/BinOutput/Quest/{main_id}.json")
+              cur_by = {int(x["subId"]): x for x in cur.get("subQuests", [])}
+              r37 = {int(x["subId"]): x for x in ref37.get("subQuests", [])}
+              r40 = {int(x["subId"]): x for x in ref40.get("subQuests", [])}
+              if set(cur_by) != set(r37) or set(r37) != set(r40):
+                  raise SystemExit(
+                      f"membership mismatch main={main_id}: current={sorted(cur_by)} ref37={sorted(r37)} ref40={sorted(r40)}"
+                  )
+
+              for sid in sorted(r37):
+                  expected37 = normalize_accept(r37[sid].get("acceptCond"))
+                  expected40 = normalize_accept(r40[sid].get("acceptCond"))
+                  comb37 = effective_comb(r37[sid])
+                  comb40 = effective_comb(r40[sid])
+                  if expected37 != expected40 or comb37 != comb40:
+                      ref_disagreement += 1
+                      raise SystemExit(
+                          f"reference prerequisite disagreement main={main_id} sub={sid}: "
+                          f"3700={(expected37, comb37)!r} 4000={(expected40, comb40)!r}"
+                      )
+
+                  source_current = normalize_accept(cur_by[sid].get("acceptCond"))
+                  if source_current:
+                      raise SystemExit(
+                          f"expected current 7.1 source prerequisite loss for {sid}, got {source_current!r}"
+                      )
+                  source_missing += 1
+
+                  excel_row = excel_by.get(sid)
+                  if excel_row is None:
+                      raise SystemExit(f"QuestExcel row missing or duplicated for Chapter 1207 subquest {sid}")
+                  if int(excel_row.get("mainId") or 0) != main_id:
+                      raise SystemExit(
+                          f"QuestExcel mainId mismatch for {sid}: {excel_row.get('mainId')} != {main_id}"
+                      )
+
+                  current_accept = normalize_accept(excel_row.get("acceptCond"))
+                  expected_accept = canonical(expected37)
+                  damaged_accept = []
+                  if current_accept != expected37:
+                      excel_accept_drift += 1
+                      damaged_accept = [canonical(current_accept)]
+
+                  expected_comb = comb37 if comb37 != "LOGIC_AND" else None
+                  damaged_comb = []
+                  if expected_comb is not None and effective_comb(excel_row) != comb37:
+                      comb_drift += 1
+                      raw = excel_row.get("acceptCondComb")
+                      if raw not in (None, "", "LOGIC_NONE"):
+                          damaged_comb.append(raw)
+
+                  rows.append(
+                      (
+                          f"{main_id}.json",
+                          main_id,
+                          sid,
+                          expected_accept,
+                          damaged_accept,
+                          expected_comb,
+                          damaged_comb,
+                      )
+                  )
+
+          if ref_disagreement != 0:
+              raise SystemExit(f"unexpected reference disagreements: {ref_disagreement}")
+          if len(rows) != expected_total or source_missing != expected_total:
+              raise SystemExit(
+                  f"expected {expected_total} consensus/source-loss rows, got rows={len(rows)} source_missing={source_missing}"
+              )
+          if excel_accept_drift != 50:
+              raise SystemExit(f"expected 50 QuestExcel acceptCond drifts, got {excel_accept_drift}")
+          if comb_drift != 3:
+              raise SystemExit(f"expected 3 special-combiner drifts, got {comb_drift}")
+
+          literal = pprint.pformat(tuple(rows), width=120, sort_dicts=False)
+          module = f'''#!/usr/bin/env python3
+          from __future__ import annotations
+
+          import fix_liyue_chapter1205  # noqa: F401 - extends the shared manifest on import
+          import fix_liyue_prerequisites as base
+          from fix_quest_prerequisites import Repair
+
+          # Chapter 1207 prerequisite repairs.
+          # Generated from exact normalized prerequisite consensus between GCResource 3.7 and 4.0.
+          # The 1028 files differ in unrelated fields, but all 88 prerequisite rows agree across refs.
+          # Current 7.1 BinOutput lost acceptCond on all 88 rows; QuestExcel damages 50 rows.
+          # Three rows use non-default combiners and retain their exact historical combiner semantics.
+          _ROWS = {literal}
+
+          CHAPTER_1207_REPAIRS = tuple(
+              Repair(
+                  json_file,
+                  main_id,
+                  sub_id,
+                  -1,
+                  tuple(dict(entry) for entry in expected_accept),
+                  tuple(tuple(dict(entry) for entry in variant) for variant in damaged_accept),
+                  expected_comb=expected_comb,
+                  damaged_comb=tuple(damaged_comb),
+              )
+              for json_file, main_id, sub_id, expected_accept, damaged_accept, expected_comb, damaged_comb in _ROWS
+          )
+
+          base.REPAIRS += CHAPTER_1207_REPAIRS
+
+          def main() -> int:
+              # Keep direct invocation scoped to this chapter so local/CI repair does not require
+              # checking out every older source file. Importing the module still extends the shared
+              # cumulative manifest for the permanent audit.
+              cumulative = base.REPAIRS
+              base.REPAIRS = CHAPTER_1207_REPAIRS
+              try:
+                  return base.main()
+              finally:
+                  base.REPAIRS = cumulative
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          '''
+          module = "\n".join(line[10:] if line.startswith("          ") else line for line in module.splitlines()) + "\n"
+          Path("tools/fix_chapter1207_prerequisites.py").write_text(module, encoding="utf-8")
+          print(
+              f"generated Chapter 1207 manifest rows={len(rows)} source_missing={source_missing} "
+              f"excel_accept_drift={excel_accept_drift} comb_drift={comb_drift}"
+          )
+          PY
+          python -m py_compile tools/fix_chapter1207_prerequisites.py tools/audit_quest_prerequisite_drift.py
+          set +e
+          python tools/fix_chapter1207_prerequisites.py --check
+          status=$?
+          set -e
+          test "$status" -eq 1
+
+      - name: Apply and verify Chapter 1207 restoration
+        run: |
+          python tools/fix_chapter1207_prerequisites.py
+          python tools/fix_chapter1207_prerequisites.py --check
+          git diff --check
+          python - <<'PY'
+          import subprocess
+          allowed = {
+              "BinOutput/Quest/1019.json",
+              "BinOutput/Quest/1028.json",
+              "BinOutput/Quest/1029.json",
+              "BinOutput/Quest/1030.json",
+              "BinOutput/Quest/1031.json",
+              "ExcelBinOutput/QuestExcelConfigData.json",
+          }
+          changed = set(subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines())
+          if changed != allowed:
+              raise SystemExit(f"expected exactly {sorted(allowed)}, got {sorted(changed)}")
+          print("validated Chapter 1207 modified resource allowlist")
+          PY
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 1019 --main 1028 --main 1029 --main 1030 --main 1031 \
+            --include-reference-only --only-differences --json chapter1207-after-repair.json
+          python - <<'PY'
+          import json
+          report = json.load(open("chapter1207-after-repair.json", encoding="utf-8"))
+          diffs = [row for row in report["rows"] if row["classification"] != "match"]
+          if diffs:
+              raise SystemExit(f"Chapter 1207 still has prerequisite differences: {diffs}")
+          if report["counts"].get("match") != 88:
+              raise SystemExit(f"expected 88 consensus matches, got {report['counts']}")
+          if report["reference_disagreements"] or report["partial_reference_coverage"]:
+              raise SystemExit(f"reference coverage is not clean: {report}")
+          print("PASS: Chapter 1207 prerequisite graph = 88/88 historical consensus")
+          PY
+
+      - name: Commit repaired resources and manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tools/fix_chapter1207_prerequisites.py \
+            BinOutput/Quest/1019.json \
+            BinOutput/Quest/1028.json \
+            BinOutput/Quest/1029.json \
+            BinOutput/Quest/1030.json \
+            BinOutput/Quest/1031.json \
+            ExcelBinOutput/QuestExcelConfigData.json
+          git diff --cached --check
+          git commit -m "fix: restore Chapter 1207 prerequisites [skip ci]"
+          git push origin HEAD:main
