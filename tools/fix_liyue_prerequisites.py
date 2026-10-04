@@ -122,13 +122,14 @@ def patch_source_row(row: dict, repair: Repair) -> list[str]:
         current_comb = row.get("acceptCondComb")
         if current_comb == repair.expected_comb:
             pass
-        elif current_comb in (None, "", "LOGIC_NONE"):
+        elif current_comb in (None, "", "LOGIC_NONE") or current_comb in repair.damaged_comb:
             row["acceptCondComb"] = repair.expected_comb
             changes.append(f"acceptCondComb={repair.expected_comb}")
         else:
             raise ValueError(
                 f"Quest {repair.sub_id} has unexpected source acceptCondComb={current_comb!r}; "
-                f"expected missing or {repair.expected_comb}"
+                f"expected {repair.expected_comb!r}, missing, or one of damaged variants "
+                f"{repair.damaged_comb!r}"
             )
 
     return changes

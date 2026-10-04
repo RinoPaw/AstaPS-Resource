@@ -30,6 +30,7 @@ class Repair:
     expected_accept: tuple[dict, ...]
     damaged_accept: tuple[tuple[dict, ...], ...]
     expected_comb: str | None = None
+    damaged_comb: tuple[str, ...] = ()
 
 
 def one(predecessor: int, *, state: int = FINISHED) -> tuple[dict, ...]:
@@ -363,13 +364,14 @@ def patch_object(raw: str, repair: Repair) -> tuple[str, str, list[str]]:
         current_comb = obj.get("acceptCondComb")
         if current_comb == repair.expected_comb:
             pass
-        elif current_comb in (None, "", "LOGIC_NONE"):
+        elif current_comb in (None, "", "LOGIC_NONE") or current_comb in repair.damaged_comb:
             obj["acceptCondComb"] = repair.expected_comb
             changes.append(f"acceptCondComb={repair.expected_comb}")
         else:
             raise ValueError(
                 f"Quest {repair.sub_id} has unexpected acceptCondComb={current_comb!r}; "
-                f"expected missing or {repair.expected_comb}"
+                f"expected {repair.expected_comb!r}, missing, or one of damaged variants "
+                f"{repair.damaged_comb!r}"
             )
 
     if not changes:
