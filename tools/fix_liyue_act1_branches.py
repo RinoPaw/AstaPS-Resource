@@ -208,6 +208,57 @@ BRANCH_REPAIRS = (
     Repair("1014.json", 1014, 101403, -1, one(101408), (one(101408),)),
     Repair("1014.json", 1014, 101404, -1, one(101403), (one(101403),)),
     Repair("1014.json", 1014, 101407, -1, one(101404), (one(101404),)),
+
+    # MQ1013: Chapter 1102 bargaining finale. Three bargaining branches fan out
+    # from 101301. Failed/finished state=4 gates and OR recovery controllers are
+    # semantically significant and must survive flattening exactly.
+    Repair("1013.json", 1013, 101301, -1, one(101407), (one(0),)),
+    Repair("1013.json", 1013, 101302, -1, one(99902), (one(101301),)),
+    Repair("1013.json", 1013, 101303, -1, one(101301), (one(101302),)),
+    Repair("1013.json", 1013, 101321, -1, one(101301), (one(101303),)),
+    Repair("1013.json", 1013, 101304, -1, one(101303, state=4), (one(101321),)),
+    Repair("1013.json", 1013, 101305, -1, one(101304, state=4), (one(101304),)),
+    Repair("1013.json", 1013, 101306, -1, one(101305), (one(101305),)),
+    Repair("1013.json", 1013, 101307, -1, one(101301), (one(101306),)),
+    Repair("1013.json", 1013, 101322, -1, one(101301), (one(101307),)),
+    Repair("1013.json", 1013, 101308, -1, one(101307, state=4), (one(101322),)),
+    Repair("1013.json", 1013, 101309, -1, one(101308, state=4), (one(101308),)),
+    Repair("1013.json", 1013, 101310, -1, one(101309), (one(101309),)),
+    Repair("1013.json", 1013, 101311, -1, one(101301), (one(101310),)),
+    Repair("1013.json", 1013, 101323, -1, one(101301), (one(101311),)),
+    Repair("1013.json", 1013, 101312, -1, one(101311, state=4), (one(101323),)),
+    Repair("1013.json", 1013, 101313, -1, one(101312, state=4), (one(101312),)),
+    Repair("1013.json", 1013, 101314, -1, one(101313), (one(101313),)),
+    Repair("1013.json", 1013, 101315, -1, one(101301), (one(101314),)),
+    Repair("1013.json", 1013, 101316, -1, one(101301), (one(101315),)),
+    Repair(
+        "1013.json",
+        1013,
+        101317,
+        -1,
+        (state_equal(101303), state_equal(101303, state=4)),
+        (one(101316),),
+        expected_comb="LOGIC_OR",
+    ),
+    Repair(
+        "1013.json",
+        1013,
+        101318,
+        -1,
+        (state_equal(101307), state_equal(101307, state=4)),
+        (one(101317),),
+        expected_comb="LOGIC_OR",
+    ),
+    Repair(
+        "1013.json",
+        1013,
+        101319,
+        -1,
+        (state_equal(101311), state_equal(101311, state=4)),
+        (one(101318),),
+        expected_comb="LOGIC_OR",
+    ),
+    Repair("1013.json", 1013, 101320, -1, one(101316), (one(101319),)),
 )
 
 base.REPAIRS += BRANCH_REPAIRS
