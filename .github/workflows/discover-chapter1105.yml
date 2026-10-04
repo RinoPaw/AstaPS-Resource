@@ -1,0 +1,61 @@
+name: Discover Chapter 1105 quest scope
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/discover-chapter1105.yml"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/ChapterExcelConfigData.json
+            ExcelBinOutput/MainQuestExcelConfigData.json
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Inspect Chapter 1105 scope
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          chapter = json.loads(Path("ExcelBinOutput/ChapterExcelConfigData.json").read_text(encoding="utf-8"))
+          main = json.loads(Path("ExcelBinOutput/MainQuestExcelConfigData.json").read_text(encoding="utf-8"))
+          quest = json.loads(Path("ExcelBinOutput/QuestExcelConfigData.json").read_text(encoding="utf-8"))
+
+          for cid in (1104, 1105, 1106):
+              rows = [x for x in chapter if int(x.get("id") or 0) == cid]
+              print(f"chapter {cid}: {json.dumps(rows, ensure_ascii=False, sort_keys=True)}")
+
+          mains = [x for x in main if int(x.get("chapterId") or 0) == 1105]
+          print(f"chapter1105-main-count={len(mains)}")
+          for row in mains:
+              print("main", json.dumps({
+                  "id": row.get("id"),
+                  "chapterId": row.get("chapterId"),
+                  "luaPath": row.get("luaPath"),
+                  "series": row.get("series"),
+                  "type": row.get("type"),
+                  "suggestTrackMainQuestList": row.get("suggestTrackMainQuestList"),
+              }, ensure_ascii=False, sort_keys=True))
+
+          main_ids = {int(x.get("id") or 0) for x in mains}
+          qrows = [x for x in quest if int(x.get("mainId") or 0) in main_ids]
+          counts = Counter(int(x.get("mainId") or 0) for x in qrows)
+          print(f"chapter1105-flattened-total={len(qrows)} counts={dict(sorted(counts.items()))}")
+          for mid in sorted(main_ids):
+              subs = sorted(int(x.get("subId") or 0) for x in qrows if int(x.get("mainId") or 0) == mid)
+              print(f"flattened main={mid} count={len(subs)} subs={subs}")
+          PY
