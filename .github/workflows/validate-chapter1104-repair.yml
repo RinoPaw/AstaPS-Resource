@@ -1,0 +1,124 @@
+name: Validate Chapter 1104 quest-row restoration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-chapter1104-repair.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout current resource subset
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+            ExcelBinOutput/QuestExcelConfigData.json
+            ExcelBinOutput/ChapterExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 quest subset
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+
+      - name: Checkout GCResource 4.0 quest subset
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile repair tools
+        run: |
+          python -m py_compile \
+            tools/fix_quest_prerequisites.py \
+            tools/fix_liyue_prerequisites.py \
+            tools/fix_chapter1104_quest_rows.py \
+            tools/audit_quest_prerequisite_drift.py
+
+      - name: Require current damage shape
+        run: |
+          set +e
+          python tools/fix_chapter1104_quest_rows.py --check
+          status=$?
+          set -e
+          test "$status" -eq 1
+
+      - name: Simulate Chapter 1104 restoration
+        run: |
+          python tools/fix_chapter1104_quest_rows.py
+          python tools/fix_chapter1104_quest_rows.py --check
+          git diff --check
+
+          python - <<'PY'
+          import subprocess
+
+          allowed = {
+              "BinOutput/Quest/8000.json",
+              "BinOutput/Quest/8001.json",
+              "BinOutput/Quest/8002.json",
+              "BinOutput/Quest/8003.json",
+              "ExcelBinOutput/QuestExcelConfigData.json",
+          }
+          changed = set(
+              subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines()
+          )
+          if changed != allowed:
+              raise SystemExit(f"expected exactly {sorted(allowed)}, got {sorted(changed)}")
+          print("validated Chapter 1104 modified path allowlist")
+          PY
+
+      - name: Re-audit restored flattened graph against both references
+        run: |
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 8000 --main 8001 --main 8002 --main 8003 \
+            --include-reference-only \
+            --only-differences \
+            --json chapter1104-after-simulated-repair.json
+
+          python - <<'PY'
+          import json
+          report = json.load(open("chapter1104-after-simulated-repair.json", encoding="utf-8"))
+          rows = report["rows"]
+          diffs = [row for row in rows if row["classification"] != "match"]
+          if diffs:
+              raise SystemExit(f"Chapter 1104 still has prerequisite differences: {diffs}")
+          counts = report["counts"]
+          if counts.get("match") != 42:
+              raise SystemExit(f"expected 42 consensus matches, got {counts}")
+          if report["reference_disagreements"] or report["partial_reference_coverage"]:
+              raise SystemExit(f"reference coverage is not clean: {report}")
+          print("PASS: Chapter 1104 flattened prerequisite graph = 42/42 historical consensus")
+          PY
