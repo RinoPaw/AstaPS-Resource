@@ -35,6 +35,13 @@ class ReferenceMatch:
     source: str
 
 
+@dataclass(frozen=True)
+class SourceProbe:
+    found: bool
+    meaningful_count: int
+    source: str | None
+
+
 def load_json(path: Path):
     with path.open("r", encoding="utf-8") as fp:
         return json.load(fp)
@@ -123,6 +130,22 @@ def iter_subquests(document) -> Iterable[dict]:
                 yield row
 
 
+def find_source_probe(root: Path | None, candidate: Candidate) -> SourceProbe:
+    if root is None:
+        return SourceProbe(False, 0, None)
+    path = quest_file_for(root, candidate.json_file, candidate.main_id)
+    if path is None:
+        return SourceProbe(False, 0, None)
+    try:
+        document = load_json(path)
+    except (OSError, json.JSONDecodeError):
+        return SourceProbe(False, 0, str(path))
+    for row in iter_subquests(document):
+        if int(row.get("subId") or 0) == candidate.sub_id:
+            return SourceProbe(True, len(meaningful_conditions(row.get("acceptCond"))), str(path))
+    return SourceProbe(False, 0, str(path))
+
+
 def find_reference_match(root: Path | None, candidate: Candidate) -> ReferenceMatch | None:
     if root is None:
         return None
@@ -139,8 +162,6 @@ def find_reference_match(root: Path | None, candidate: Candidate) -> ReferenceMa
         if int(row.get("subId") or 0) != candidate.sub_id:
             continue
         conditions = meaningful_conditions(row.get("acceptCond"))
-        # A safe automatic comparison needs one meaningful state-equal predecessor. If historical
-        # data has compound or non-state conditions, leave it for manual review instead of guessing.
         matches: list[tuple[int, int]] = []
         for cond in conditions:
             if cond.get("type") != STATE_EQUAL:
@@ -163,13 +184,20 @@ def find_reference_match(root: Path | None, candidate: Candidate) -> ReferenceMa
 
 def classify(
     candidate: Candidate,
+    source_probe: SourceProbe,
     local_match: ReferenceMatch | None,
     historical_match: ReferenceMatch | None,
 ) -> str:
+    # Historical intact data is the strongest evidence that the flattened zero is a conversion loss.
     if historical_match is not None and historical_match.state == FINISHED:
         return "historical-repair"
+    # Some source BinOutput files still retain a real predecessor even when the flattened Excel lost it.
     if local_match is not None and local_match.state == FINISHED:
         return "local-binout-repair"
+    # Newer 7.x quests often have no source acceptCond at all. Their flattened [0,3] is therefore a
+    # root/external-trigger placeholder until another intact source proves a missing predecessor.
+    if source_probe.found and source_probe.meaningful_count == 0:
+        return "source-root-or-external"
     if candidate.is_chapter_begin:
         return "chapter-begin-unresolved"
     if candidate.order > 1:
@@ -209,15 +237,17 @@ def main() -> int:
         default=None,
         help="Write the complete machine-readable audit report to this path.",
     )
+    categories = (
+        "historical-repair",
+        "local-binout-repair",
+        "source-root-or-external",
+        "chapter-begin-unresolved",
+        "internal-order-unresolved",
+        "root-like-unresolved",
+    )
     parser.add_argument(
         "--only",
-        choices=(
-            "historical-repair",
-            "local-binout-repair",
-            "chapter-begin-unresolved",
-            "internal-order-unresolved",
-            "root-like-unresolved",
-        ),
+        choices=categories,
         default=None,
         help="Print only one classification while keeping totals over the full scan.",
     )
@@ -229,9 +259,10 @@ def main() -> int:
     report: list[dict] = []
     counts: Counter[str] = Counter()
     for candidate in candidates:
+        source_probe = find_source_probe(args.bin_root, candidate)
         local_match = find_reference_match(args.bin_root, candidate)
         historical_match = find_reference_match(args.reference_bin_root, candidate)
-        kind = classify(candidate, local_match, historical_match)
+        kind = classify(candidate, source_probe, local_match, historical_match)
         counts[kind] += 1
 
         best = historical_match or local_match
@@ -245,6 +276,9 @@ def main() -> int:
             "desc_hash": candidate.desc_hash,
             "chapter_begin": candidate.is_chapter_begin,
             "accept_index": candidate.accept_index,
+            "source_row_found": source_probe.found,
+            "source_meaningful_accept_count": source_probe.meaningful_count,
+            "source_file": source_probe.source,
             "reference_predecessor": best.predecessor if best else None,
             "reference_state": best.state if best else None,
             "reference_source": best.source if best else None,
@@ -252,19 +286,13 @@ def main() -> int:
         report.append(item)
 
     print(f"Candidates with QUEST_COND_STATE_EQUAL [0,{FINISHED}]: {len(candidates)}")
-    for name in (
-        "historical-repair",
-        "local-binout-repair",
-        "chapter-begin-unresolved",
-        "internal-order-unresolved",
-        "root-like-unresolved",
-    ):
+    for name in categories:
         print(f"  {name}: {counts[name]}")
 
     printable = report if args.only is None else [row for row in report if row["classification"] == args.only]
     if printable:
         print()
-        print("class\tmain\tsub\torder\tchapterBegin\tpredecessor\tjson_file\treference")
+        print("class\tmain\tsub\torder\tchapterBegin\tsourceAcceptCount\tpredecessor\tjson_file\treference")
         for row in printable:
             print(
                 "\t".join(
@@ -274,6 +302,7 @@ def main() -> int:
                         str(row["sub_id"]),
                         str(row["order"]),
                         "yes" if row["chapter_begin"] else "no",
+                        str(row["source_meaningful_accept_count"]),
                         str(row["reference_predecessor"] or ""),
                         str(row["json_file"]),
                         str(row["reference_source"] or ""),
