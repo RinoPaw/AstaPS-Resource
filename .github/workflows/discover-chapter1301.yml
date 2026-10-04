@@ -1,0 +1,157 @@
+name: Discover Chapter 1301 prerequisite drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/discover-chapter1301.yml"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout current Chapter 1301 subset
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - name: Checkout GCResource 4.0 reference
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Audit flattened graph with row-level reference consensus
+        run: |
+          python -m py_compile tools/audit_quest_prerequisite_drift.py tools/filter_quest_prerequisite_consensus.py
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 3000 --main 3001 --main 3002 --main 3003 --main 3004 --main 3005 --main 3006 \
+            --include-reference-only --only-differences --json chapter1301-audit.json
+          python tools/filter_quest_prerequisite_consensus.py \
+            chapter1301-audit.json \
+            --main 3000 --main 3001 --main 3002 --main 3003 --main 3004 --main 3005 --main 3006 \
+            --consensus-count 2 --json chapter1301-consensus.json
+
+      - name: Audit reference and source prerequisite shapes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import sys
+          from collections import Counter
+          from pathlib import Path
+
+          sys.path.insert(0, "tools")
+          from fix_quest_prerequisites import normalize_accept
+
+          mains = (3000, 3001, 3002, 3003, 3004, 3005, 3006)
+          total = consensus = disagreement = source_match = source_missing = source_other = 0
+          combs = Counter()
+          types = Counter()
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding="utf-8"))
+
+          def comb(row):
+              return row.get("acceptCondComb") or "LOGIC_AND"
+
+          for main_id in mains:
+              cur_path = Path("BinOutput/Quest") / f"{main_id}.json"
+              r37_path = Path("ref3700/BinOutput/Quest") / f"{main_id}.json"
+              r40_path = Path("ref4000/BinOutput/Quest") / f"{main_id}.json"
+              ah = hashlib.sha256(r37_path.read_bytes()).hexdigest()
+              bh = hashlib.sha256(r40_path.read_bytes()).hexdigest()
+              print(f"reference-file-{'identical' if ah == bh else 'different'} {main_id}.json 3700={ah[:16]} 4000={bh[:16]}")
+
+              cur = load(cur_path)
+              r37 = load(r37_path)
+              r40 = load(r40_path)
+              cur_by = {int(x['subId']): x for x in cur.get('subQuests', [])}
+              a_by = {int(x['subId']): x for x in r37.get('subQuests', [])}
+              b_by = {int(x['subId']): x for x in r40.get('subQuests', [])}
+              print(
+                  f"membership main={main_id} current={len(cur_by)} ref3700={len(a_by)} ref4000={len(b_by)} "
+                  f"current-only={sorted(set(cur_by) - set(a_by) - set(b_by))} "
+                  f"ref-only={sorted((set(a_by) | set(b_by)) - set(cur_by))}"
+              )
+
+              for sid in sorted(set(a_by) | set(b_by)):
+                  total += 1
+                  if sid not in a_by or sid not in b_by:
+                      disagreement += 1
+                      print(f"reference-membership-disagreement main={main_id} sub={sid}")
+                      continue
+                  a = (normalize_accept(a_by[sid].get('acceptCond')), comb(a_by[sid]))
+                  b = (normalize_accept(b_by[sid].get('acceptCond')), comb(b_by[sid]))
+                  if a != b:
+                      disagreement += 1
+                      print(f"reference-prerequisite-disagreement main={main_id} sub={sid} ref3700={a!r} ref4000={b!r}")
+                      continue
+                  consensus += 1
+                  combs[a[1]] += 1
+                  for entry in a[0]:
+                      types[entry.get('type')] += 1
+                  got = normalize_accept(cur_by.get(sid, {}).get('acceptCond'))
+                  if got == a[0]:
+                      source_match += 1
+                  elif not got and a[0]:
+                      source_missing += 1
+                  else:
+                      source_other += 1
+                      print(f"source-other main={main_id} sub={sid} current={got!r} expected={a[0]!r}")
+
+          print(
+              f"reference-summary total={total} consensus={consensus} disagreement={disagreement}"
+          )
+          print(
+              f"source-summary consensus={consensus} match={source_match} missing={source_missing} other={source_other}"
+          )
+          print(f"combiner-summary={dict(sorted(combs.items()))}")
+          print(f"condition-type-summary={dict(sorted(types.items()))}")
+          PY
