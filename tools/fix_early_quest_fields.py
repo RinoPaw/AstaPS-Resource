@@ -123,10 +123,18 @@ EXPECTED_LOGIC = {
     # The next visible Forest Rendezvous step waits for the visible approach task and the hidden
     # Dvalin plot controller to both finish.
     35502: {"acceptCondComb": "LOGIC_AND"},
+    # Hidden controller 30901 completes only after all three early temple dungeons are finished.
+    30901: {"finishCondComb": "LOGIC_AND"},
+    # 31101 accepts either of the two Paimon talks depending on the hidden 46904 branch state.
+    31101: {"finishCondComb": "LOGIC_OR"},
+    # 35901 may complete through either the plot completion or the explicit quest-progress signal.
+    35901: {"finishCondComb": "LOGIC_OR"},
 }
 
 TARGETS = set(EXPECTED_BEGIN_EXECS) | set(EXPECTED_ACCEPT) | set(EXPECTED_LOGIC)
 EXPECTED_MAIN = {
+    30901: 309,
+    31101: 311,
     35100: 351,
     35102: 351,
     35103: 351,
@@ -146,6 +154,7 @@ EXPECTED_MAIN = {
     35503: 355,
     35504: 355,
     35505: 355,
+    35901: 359,
     36100: 361,
     36101: 361,
 }
