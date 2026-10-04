@@ -4,7 +4,7 @@ from __future__ import annotations
 import fix_liyue_prerequisites as base
 from fix_quest_prerequisites import Repair, one, state_equal
 
-# Liyue Act I branch / convergence extension.
+# Liyue Act I branch / convergence extension plus the Chapter 1102 entry.
 #
 # Evidence:
 # - GCResource 3.7 and 4.0 agree on these prerequisite graphs.
@@ -67,6 +67,18 @@ BRANCH_REPAIRS = (
         (one(0),),
         expected_comb="LOGIC_AND",
     ),
+
+    # MQ1010: Chapter 1102 entry after the three-branch convergence.
+    # 101004 is an independent hidden controller rooted at 99902; the flattened
+    # order chain incorrectly makes 101007 depend on it.
+    Repair("1010.json", 1010, 101001, -1, one(101801), (one(0),)),
+    Repair("1010.json", 1010, 101002, -1, one(101001), (one(101001),)),
+    Repair("1010.json", 1010, 101003, -1, one(101002), (one(101002),)),
+    Repair("1010.json", 1010, 101004, -1, one(99902), (one(101003),)),
+    Repair("1010.json", 1010, 101007, -1, one(101003), (one(101004),)),
+    Repair("1010.json", 1010, 101008, -1, one(101007), (one(101007),)),
+    Repair("1010.json", 1010, 101005, -1, one(101008), (one(101008),)),
+    Repair("1010.json", 1010, 101006, -1, one(101005), (one(101005),)),
 )
 
 base.REPAIRS += BRANCH_REPAIRS
