@@ -77,6 +77,8 @@ EXPECTED_BEGIN_EXECS = {
         exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003449"]),
         exec_entry("QUEST_EXEC_ADD_CUR_AVATAR_ENERGY", []),
     ],
+    # Forest Rendezvous hidden plot controller. This suite is active only while 36100 is running.
+    36100: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003436,1"])],
 }
 
 EXPECTED_ACCEPT = {
@@ -88,6 +90,15 @@ EXPECTED_ACCEPT = {
     35310: [state_equal(35303)],
     35304: [state_equal(35310)],
     35311: [state_equal(35304)],
+    # Forest Rendezvous (main 355) starts after Unexpected Power is fully complete.
+    35501: [state_equal(35311)],
+    35502: [state_equal(35501), state_equal(36101), state_equal(36101)],
+    35503: [state_equal(35502)],
+    35504: [state_equal(35503)],
+    35505: [state_equal(35504)],
+    # Hidden Dvalin plot controller paired with visible quest 35501.
+    36100: [state_equal(35311)],
+    36101: [state_equal(36100)],
 }
 
 # Exact converter-damaged variants observed in the 7.1 dump. Keep these per-subquest instead of
@@ -107,6 +118,9 @@ EXPECTED_LOGIC = {
     # The overlook step must wait for BOTH FINISH_PLOT(35203) and trigger 1172
     # (Scene 3 / group 133003901 / ENTER_REGION_901002).
     35203: {"finishCondComb": "LOGIC_AND", "failCondComb": "LOGIC_OR"},
+    # The next visible Forest Rendezvous step waits for the visible approach task and the hidden
+    # Dvalin plot controller to both finish.
+    35502: {"acceptCondComb": "LOGIC_AND"},
 }
 
 TARGETS = set(EXPECTED_BEGIN_EXECS) | set(EXPECTED_ACCEPT) | set(EXPECTED_LOGIC)
@@ -125,6 +139,13 @@ EXPECTED_MAIN = {
     35310: 353,
     35311: 353,
     35312: 353,
+    35501: 355,
+    35502: 355,
+    35503: 355,
+    35504: 355,
+    35505: 355,
+    36100: 361,
+    36101: 361,
 }
 
 
@@ -177,12 +198,12 @@ def patch_record(obj: dict) -> list[str]:
         if current == expected:
             pass
         elif not current or current in damaged:
-            # The 7.1 converter is known to either zero the predecessor id or sequentialize one of
-            # the early parallel quest-353 nodes. Only those exact per-subquest shapes are repaired;
-            # any other meaningful predecessor still aborts below.
+            # The 7.1 converter is known to zero, drop, or sequentialize predecessor fields in this
+            # early Archon chain. Only evidence-backed target rows are repaired here; any other
+            # meaningful predecessor still aborts below.
             obj["acceptCond"] = expected_accept
-            predecessor = expected_accept[0]["param"][0]
-            changes.append(f"acceptCond={predecessor}:FINISHED")
+            predecessors = ",".join(str(entry["param"][0]) for entry in expected_accept)
+            changes.append(f"acceptCond={predecessors}:FINISHED")
         else:
             raise ValueError(
                 f"Quest {sub_id} has unexpected meaningful acceptCond: {current!r}; "
