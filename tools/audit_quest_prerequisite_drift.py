@@ -162,7 +162,14 @@ def main() -> int:
         ),
     )
     parser.add_argument("--chapter-excel", type=Path, default=DEFAULT_CHAPTER_EXCEL)
-    parser.add_argument("--main", type=int, default=None, help="Limit output to one main quest id.")
+    parser.add_argument(
+        "--main",
+        dest="main_ids",
+        type=int,
+        action="append",
+        default=[],
+        help="Limit output to one main quest id. Repeat to select multiple main quests.",
+    )
     parser.add_argument("--only-differences", action="store_true")
     parser.add_argument("--json", dest="json_output", type=Path, default=None)
     args = parser.parse_args()
@@ -171,6 +178,7 @@ def main() -> int:
     if not isinstance(root, list):
         raise SystemExit(f"{args.quest_excel} must contain a top-level JSON array")
 
+    selected_main_ids = set(args.main_ids)
     chapter_begins = chapter_begin_ids(args.chapter_excel)
     counts: Counter[str] = Counter()
     report: list[dict] = []
@@ -183,7 +191,7 @@ def main() -> int:
             continue
         main_id = int(row.get("mainId") or 0)
         sub_id = int(row.get("subId") or 0)
-        if args.main is not None and main_id != args.main:
+        if selected_main_ids and main_id not in selected_main_ids:
             continue
 
         json_file = str(row.get("json_file") or "")
@@ -267,6 +275,8 @@ def main() -> int:
 
     print("Quest prerequisite drift audit")
     print(f"  reference roots: {len(args.reference_bin_root)}")
+    if selected_main_ids:
+        print(f"  main ids: {','.join(map(str, sorted(selected_main_ids)))}")
     print(f"  compared with consensus: {sum(counts.values()) - counts['reference-disagreement']}")
     print(f"  reference-missing-all: {missing_all_references}")
     print(f"  partial-reference-coverage: {partial_reference_coverage}")
@@ -334,6 +344,7 @@ def main() -> int:
             json.dumps(
                 {
                     "reference_roots": [str(root) for root in args.reference_bin_root],
+                    "main_ids": sorted(selected_main_ids),
                     "counts": dict(counts),
                     "reference_missing_all": missing_all_references,
                     "partial_reference_coverage": partial_reference_coverage,
