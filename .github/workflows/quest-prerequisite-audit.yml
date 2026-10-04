@@ -60,28 +60,7 @@ jobs:
             tools/fix_liyue_chapter1102.py \
             tools/fix_liyue_chapter1103.py
 
-      - name: Verify repaired baseline through MQ1024
-        run: |
-          python - <<'PY'
-          import sys
-          from pathlib import Path
-
-          sys.path.insert(0, "tools")
-          import fix_liyue_chapter1103 as entry
-          import fix_liyue_prerequisites as base
-
-          all_repairs = base.REPAIRS
-          assert len(all_repairs) == 242, f"expected 242 cumulative repair rows, got {len(all_repairs)}"
-          assert len({repair.sub_id for repair in all_repairs}) == len(all_repairs), "duplicate subId in cumulative manifest"
-
-          base.REPAIRS = all_repairs[:-21]
-          assert len(base.REPAIRS) == 221
-          assert base.patch_sources(Path("BinOutput/Quest"), check=True) == 0
-          assert base.patch_excel(Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True) == 0
-          print("Prerequisite repair baseline through MQ1024 remains clean and idempotent.")
-          PY
-
-      - name: Strict dry-check MQ1025 batch
+      - name: Verify repaired prerequisite graph through Chapter 1103
         run: |
           python - <<'PY'
           import sys
@@ -94,16 +73,7 @@ jobs:
           ids = [repair.sub_id for repair in base.REPAIRS]
           assert len(ids) == 242, f"expected 242 cumulative repair rows, got {len(ids)}"
           assert len(ids) == len(set(ids)), "duplicate subId in cumulative repair manifest"
-
-          source_status = base.patch_sources(Path("BinOutput/Quest"), check=True)
-          excel_status = base.patch_excel(
-              Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True
-          )
-          assert source_status in (0, 1)
-          assert excel_status in (0, 1)
-          print(
-              "MQ1025 strict dry-check completed:",
-              f"source_pending={bool(source_status)}",
-              f"excel_pending={bool(excel_status)}",
-          )
+          assert base.patch_sources(Path("BinOutput/Quest"), check=True) == 0
+          assert base.patch_excel(Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True) == 0
+          print("Prerequisite graph through Chapter 1103 is clean and idempotent.")
           PY
