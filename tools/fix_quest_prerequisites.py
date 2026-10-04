@@ -43,6 +43,14 @@ REPAIRS = (
         broken_predecessor=0,
         correct_predecessor=35102,
     ),
+    Repair(
+        json_file="363.json",
+        main_id=363,
+        sub_id=36301,
+        desc_hash=0,
+        broken_predecessor=0,
+        correct_predecessor=35202,
+    ),
 )
 
 
