@@ -67,7 +67,9 @@ def chapter_begin_ids(path: Path) -> set[int]:
     return {
         int(row.get("beginQuestId"))
         for row in root
-        if isinstance(row, dict) and isinstance(row.get("beginQuestId"), int) and row.get("beginQuestId") > 0
+        if isinstance(row, dict)
+        and isinstance(row.get("beginQuestId"), int)
+        and row.get("beginQuestId") > 0
     }
 
 
@@ -83,7 +85,9 @@ def reference_file(root: Path, json_file: str, main_id: int) -> Path | None:
     return None
 
 
-def load_reference_row(root: Path, json_file: str, main_id: int, sub_id: int) -> tuple[dict | None, str | None]:
+def load_reference_row(
+    root: Path, json_file: str, main_id: int, sub_id: int
+) -> tuple[dict | None, str | None]:
     path = reference_file(root, json_file, main_id)
     if path is None:
         return None, None
@@ -104,7 +108,9 @@ def is_zero_finished(conditions: list[dict]) -> bool:
     return cond.get("type") == STATE_EQUAL and cond.get("param") == [0, 3]
 
 
-def classify(current: list[dict], current_comb: str, reference: list[dict], reference_comb: str) -> str:
+def classify(
+    current: list[dict], current_comb: str, reference: list[dict], reference_comb: str
+) -> str:
     if current == reference and current_comb == reference_comb:
         return "match"
     if is_zero_finished(current) and reference:
@@ -128,15 +134,33 @@ def classify(current: list[dict], current_comb: str, reference: list[dict], refe
     return "condition-drift"
 
 
+def reference_signature(row: dict) -> tuple[str, str]:
+    return (
+        json.dumps(normalize_accept(row.get("acceptCond")), ensure_ascii=False, sort_keys=True),
+        normalize_comb(row),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Compare the flattened 7.1 quest prerequisite graph with an intact historical "
-            "BinOutput/Quest tree. Reports all acceptCond/acceptCondComb drift; never writes resources."
+            "Compare the flattened 7.1 quest prerequisite graph with one or more intact historical "
+            "BinOutput/Quest trees. Multiple references must agree before a row is classified as "
+            "repairable drift. The command never writes resources."
         )
     )
     parser.add_argument("quest_excel", nargs="?", type=Path, default=DEFAULT_QUEST_EXCEL)
-    parser.add_argument("--reference-bin-root", type=Path, required=True)
+    parser.add_argument(
+        "--reference-bin-root",
+        type=Path,
+        action="append",
+        required=True,
+        help=(
+            "Historical BinOutput/Quest directory. Repeat for multiple versions, e.g. 3700 and 4000. "
+            "When multiple references contain the same subquest they must agree exactly on normalized "
+            "acceptCond and acceptCondComb; disagreements are reported and never treated as repairs."
+        ),
+    )
     parser.add_argument("--chapter-excel", type=Path, default=DEFAULT_CHAPTER_EXCEL)
     parser.add_argument("--main", type=int, default=None, help="Limit output to one main quest id.")
     parser.add_argument("--only-differences", action="store_true")
@@ -150,7 +174,9 @@ def main() -> int:
     chapter_begins = chapter_begin_ids(args.chapter_excel)
     counts: Counter[str] = Counter()
     report: list[dict] = []
-    missing_reference = 0
+    missing_all_references = 0
+    partial_reference_coverage = 0
+    reference_disagreements = 0
 
     for row in root:
         if not isinstance(row, dict):
@@ -161,13 +187,54 @@ def main() -> int:
             continue
 
         json_file = str(row.get("json_file") or "")
-        reference_row, source = load_reference_row(
-            args.reference_bin_root, json_file, main_id, sub_id
-        )
-        if reference_row is None:
-            missing_reference += 1
+        reference_entries: list[tuple[dict, str, str]] = []
+        missing_roots: list[str] = []
+        for reference_root in args.reference_bin_root:
+            reference_row, source = load_reference_row(reference_root, json_file, main_id, sub_id)
+            if reference_row is None:
+                missing_roots.append(str(reference_root))
+                continue
+            reference_entries.append((reference_row, source or "", str(reference_root)))
+
+        if not reference_entries:
+            missing_all_references += 1
+            continue
+        if missing_roots:
+            partial_reference_coverage += 1
+
+        signatures: dict[tuple[str, str], list[tuple[dict, str, str]]] = {}
+        for entry in reference_entries:
+            signatures.setdefault(reference_signature(entry[0]), []).append(entry)
+
+        if len(signatures) != 1:
+            reference_disagreements += 1
+            counts["reference-disagreement"] += 1
+            report.append(
+                {
+                    "classification": "reference-disagreement",
+                    "json_file": json_file,
+                    "main_id": main_id,
+                    "sub_id": sub_id,
+                    "order": int(row.get("order") or 0),
+                    "show_type": str(row.get("showType") or ""),
+                    "chapter_begin": sub_id in chapter_begins,
+                    "current_accept": normalize_accept(row.get("acceptCond")),
+                    "current_comb": normalize_comb(row),
+                    "reference_variants": [
+                        {
+                            "accept": normalize_accept(ref_row.get("acceptCond")),
+                            "comb": normalize_comb(ref_row),
+                            "source": source,
+                            "root": ref_root,
+                        }
+                        for ref_row, source, ref_root in reference_entries
+                    ],
+                    "missing_reference_roots": missing_roots,
+                }
+            )
             continue
 
+        reference_row = reference_entries[0][0]
         current_accept = normalize_accept(row.get("acceptCond"))
         reference_accept = normalize_accept(reference_row.get("acceptCond"))
         current_comb = normalize_comb(row)
@@ -191,13 +258,19 @@ def main() -> int:
                 "reference_accept": reference_accept,
                 "current_comb": current_comb,
                 "reference_comb": reference_comb,
-                "reference_source": source,
+                "reference_sources": [entry[1] for entry in reference_entries],
+                "reference_roots": [entry[2] for entry in reference_entries],
+                "missing_reference_roots": missing_roots,
+                "reference_consensus_count": len(reference_entries),
             }
         )
 
     print("Quest prerequisite drift audit")
-    print(f"  compared: {sum(counts.values())}")
-    print(f"  reference-missing: {missing_reference}")
+    print(f"  reference roots: {len(args.reference_bin_root)}")
+    print(f"  compared with consensus: {sum(counts.values()) - counts['reference-disagreement']}")
+    print(f"  reference-missing-all: {missing_all_references}")
+    print(f"  partial-reference-coverage: {partial_reference_coverage}")
+    print(f"  reference-disagreement: {reference_disagreements}")
     for name in (
         "match",
         "zeroed-predecessor",
@@ -216,8 +289,28 @@ def main() -> int:
 
     if printable:
         print()
-        print("class\tmain\tsub\torder\tchapterBegin\tcurrent\treference\tcurrentComb\treferenceComb")
+        print(
+            "class\tmain\tsub\torder\tchapterBegin\tconsensusRefs\tcurrent\treference\tcurrentComb\treferenceComb"
+        )
         for item in printable:
+            if item["classification"] == "reference-disagreement":
+                print(
+                    "\t".join(
+                        [
+                            item["classification"],
+                            str(item["main_id"]),
+                            str(item["sub_id"]),
+                            str(item["order"]),
+                            "yes" if item["chapter_begin"] else "no",
+                            "0",
+                            json.dumps(item["current_accept"], ensure_ascii=False, separators=(",", ":")),
+                            "<references-disagree>",
+                            item["current_comb"],
+                            "<references-disagree>",
+                        ]
+                    )
+                )
+                continue
             print(
                 "\t".join(
                     [
@@ -226,6 +319,7 @@ def main() -> int:
                         str(item["sub_id"]),
                         str(item["order"]),
                         "yes" if item["chapter_begin"] else "no",
+                        str(item["reference_consensus_count"]),
                         json.dumps(item["current_accept"], ensure_ascii=False, separators=(",", ":")),
                         json.dumps(item["reference_accept"], ensure_ascii=False, separators=(",", ":")),
                         item["current_comb"],
@@ -239,8 +333,11 @@ def main() -> int:
         args.json_output.write_text(
             json.dumps(
                 {
+                    "reference_roots": [str(root) for root in args.reference_bin_root],
                     "counts": dict(counts),
-                    "reference_missing": missing_reference,
+                    "reference_missing_all": missing_all_references,
+                    "partial_reference_coverage": partial_reference_coverage,
+                    "reference_disagreements": reference_disagreements,
                     "rows": report,
                 },
                 ensure_ascii=False,
