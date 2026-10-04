@@ -110,3 +110,31 @@ jobs:
                   print(f"source-other sub={sid} current={got!r} expected={exp!r}")
           print(f"source-summary total={len(ref_by_id)} match={match} missing={missing} other={other}")
           PY
+
+      - name: Emit normalized prerequisite manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def meaningful(row):
+              out = []
+              for entry in row.get("acceptCond") or []:
+                  if not isinstance(entry, dict) or not entry.get("type"):
+                      continue
+                  params = entry.get("param") or []
+                  if entry.get("type") in ("QUEST_COND_STATE_EQUAL", "QUEST_COND_STATE_NOT_EQUAL"):
+                      params = params[:2]
+                  out.append({
+                      "type": entry.get("type"),
+                      "param": params,
+                      "param_str": entry.get("param_str", entry.get("paramStr", "")) or "",
+                  })
+              return out
+
+          ref = json.loads(Path("ref3700/BinOutput/Quest/18000.json").read_text(encoding="utf-8"))
+          for row in sorted(ref.get("subQuests", []), key=lambda x: int(x.get("subId") or 0)):
+              sid = int(row["subId"])
+              comb = row.get("acceptCondComb") or "LOGIC_AND"
+              print(f"manifest {sid} comb={comb} accept={json.dumps(meaningful(row), ensure_ascii=False, separators=(',', ':'))}")
+          PY
