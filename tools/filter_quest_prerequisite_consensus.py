@@ -108,6 +108,9 @@ def main() -> int:
         for row in root["rows"]
         if isinstance(row, dict) and int(row.get("main_id") or 0) in PROLOGUE_MAIN_IDS
     ]
+    manifest_rows = [
+        row for row in prologue_rows if int(row.get("sub_id") or 0) in manifest_sub_ids
+    ]
     residual_rows = [
         row
         for row in prologue_rows
@@ -142,8 +145,8 @@ def main() -> int:
 
     print("Mondstadt Prologue prerequisite consensus filter")
     print(f"  report: {args.report}")
-    print(f"  manifest rows excluded: {len(manifest_sub_ids)}")
     print(f"  Prologue rows in report: {len(prologue_rows)}")
+    print(f"  manifest rows present/excluded: {len(manifest_rows)}")
     print(f"  residual differences: {len(residual_rows)}")
     print(f"  complete {args.consensus_count}-reference consensus: {len(consensus)}")
     print(f"  reference disagreements: {len(disagreements)}")
@@ -164,7 +167,14 @@ def main() -> int:
         print()
         print(title)
         print("class\tmain\tsub\torder\tcurrent\treference\tcurrentComb\treferenceComb")
-        for row in sorted(rows, key=lambda item: (int(item.get("main_id") or 0), int(item.get("order") or 0), int(item.get("sub_id") or 0))):
+        for row in sorted(
+            rows,
+            key=lambda item: (
+                int(item.get("main_id") or 0),
+                int(item.get("order") or 0),
+                int(item.get("sub_id") or 0),
+            ),
+        ):
             print(
                 "\t".join(
                     [
@@ -193,6 +203,7 @@ def main() -> int:
                     "prologue_main_ids": sorted(PROLOGUE_MAIN_IDS),
                     "required_consensus_count": args.consensus_count,
                     "manifest_sub_ids": sorted(manifest_sub_ids),
+                    "manifest_rows_present": len(manifest_rows),
                     "residual_counts": dict(class_counts),
                     "consensus_counts": dict(consensus_class_counts),
                     "simple": simple,
