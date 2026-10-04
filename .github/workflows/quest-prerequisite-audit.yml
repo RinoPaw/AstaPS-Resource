@@ -17,6 +17,7 @@ on:
       - "tools/fix_inazuma_chapter1204.py"
       - "tools/fix_liyue_chapter1205.py"
       - "tools/fix_chapter1206_quest_rows.py"
+      - "tools/fix_chapter1207_prerequisites.py"
       - "BinOutput/Quest/**.json"
       - "ExcelBinOutput/QuestExcelConfigData.json"
       - ".github/workflows/quest-prerequisite-audit.yml"
@@ -88,6 +89,11 @@ jobs:
             BinOutput/Quest/8005.json
             BinOutput/Quest/8006.json
             BinOutput/Quest/8007.json
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1028.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/1031.json
             ExcelBinOutput/QuestExcelConfigData.json
 
       - uses: actions/setup-python@v5
@@ -109,24 +115,25 @@ jobs:
             tools/fix_inazuma_chapter1203.py \
             tools/fix_inazuma_chapter1204.py \
             tools/fix_liyue_chapter1205.py \
-            tools/fix_chapter1206_quest_rows.py
+            tools/fix_chapter1206_quest_rows.py \
+            tools/fix_chapter1207_prerequisites.py
 
-      - name: Verify cumulative prerequisite graph through Chapter 1205
+      - name: Verify cumulative prerequisite graph through Chapter 1207
         run: |
           python - <<'PY'
           import sys
           from pathlib import Path
 
           sys.path.insert(0, "tools")
-          import fix_liyue_chapter1205 as entry
+          import fix_chapter1207_prerequisites as entry
           import fix_liyue_prerequisites as base
 
           ids = [repair.sub_id for repair in base.REPAIRS]
-          assert len(ids) == 590, f"expected 590 cumulative repair rows, got {len(ids)}"
+          assert len(ids) == 678, f"expected 678 cumulative repair rows, got {len(ids)}"
           assert len(ids) == len(set(ids)), "duplicate subId in cumulative repair manifest"
           assert base.patch_sources(Path("BinOutput/Quest"), check=True) == 0
           assert base.patch_excel(Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True) == 0
-          print("Cumulative prerequisite graph through Chapter 1205 is clean and idempotent.")
+          print("Cumulative prerequisite graph through Chapter 1207 is clean and idempotent.")
           PY
 
       - name: Verify Chapter 1104 quest rows and prerequisites
