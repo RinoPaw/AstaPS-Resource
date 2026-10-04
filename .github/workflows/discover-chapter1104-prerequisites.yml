@@ -19,6 +19,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             tools
+            BinOutput/Quest/1025.json
             BinOutput/Quest/8000.json
             BinOutput/Quest/8001.json
             BinOutput/Quest/8002.json
@@ -75,12 +76,13 @@ jobs:
               print(f"reference-identical {name} {ah[:16]}")
           PY
 
-      - name: Audit flattened Chapter 1104 graph
+      - name: Audit flattened Chapter 1104 graph including missing rows
         run: |
           python tools/audit_quest_prerequisite_drift.py \
             --reference-bin-root ref3700/BinOutput/Quest \
             --reference-bin-root ref4000/BinOutput/Quest \
             --main 8000 --main 8001 --main 8002 --main 8003 \
+            --include-reference-only \
             --only-differences \
             --json chapter1104-audit.json
 
@@ -125,4 +127,27 @@ jobs:
                       print(f"source-other main={main_id} sub={sid} current={got!r} expected={exp!r}")
           print(f"source-summary total={total} match={source_match} missing={source_missing} other={source_other}")
           assert source_other == 0
+          PY
+
+      - name: Compare current BinOutput and flattened row schema
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = json.loads(Path("BinOutput/Quest/1025.json").read_text(encoding="utf-8"))
+          excel = json.loads(Path("ExcelBinOutput/QuestExcelConfigData.json").read_text(encoding="utf-8"))
+          src = {int(row["subId"]): row for row in source["subQuests"]}
+          flat = {int(row["subId"]): row for row in excel if int(row.get("mainId") or 0) == 1025}
+
+          for sid in (102501, 102503, 102510):
+              a = src[sid]
+              b = flat[sid]
+              print(f"schema sub={sid}")
+              print("  source-only:", sorted(set(a) - set(b)))
+              print("  flat-only:", sorted(set(b) - set(a)))
+              print("  shared-different:")
+              for key in sorted(set(a) & set(b)):
+                  if a[key] != b[key]:
+                      print(f"    {key}: source={a[key]!r} flat={b[key]!r}")
           PY
