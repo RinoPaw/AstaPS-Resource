@@ -52,7 +52,7 @@ jobs:
             tools/fix_liyue_act1_branches.py \
             tools/fix_liyue_chapter1102.py
 
-      - name: Validate Chapter 1102 manifest against current resources
+      - name: Validate repaired Chapter 1102 resources
         run: |
           python - <<'PY'
           import sys
@@ -70,11 +70,7 @@ jobs:
           excel_status = base.patch_excel(
               Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True
           )
-          assert source_status in (0, 1)
-          assert excel_status in (0, 1)
-          print(
-              "strict dry-check completed:",
-              f"source_pending={bool(source_status)}",
-              f"excel_pending={bool(excel_status)}",
-          )
+          assert source_status == 0, "Chapter 1102 BinOutput still has pending repairs"
+          assert excel_status == 0, "Chapter 1102 QuestExcel still has pending repairs"
+          print("Chapter 1102 prerequisite repair is clean and idempotent.")
           PY
