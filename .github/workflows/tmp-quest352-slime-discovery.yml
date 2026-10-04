@@ -5,6 +5,7 @@ on:
       - '.github/workflows/tmp-quest352-slime-discovery.yml'
   workflow_dispatch:
 
+# Temporary narrow grep for the Unexpected Power slime encounter.
 jobs:
   trace:
     runs-on: ubuntu-latest
