@@ -196,6 +196,18 @@ BRANCH_REPAIRS = (
     Repair("1012.json", 1012, 101201, -1, one(101214), (one(101208),)),
     Repair("1012.json", 1012, 101215, -1, one(101210), (one(101201),)),
     Repair("1012.json", 1012, 101209, -1, one(101215), (one(101215),)),
+
+    # MQ1014: Chapter 1102 dungeon sequence. This graph is linear, but source
+    # acceptCond was still lost wholesale; only the root is visibly wrong after
+    # flattening because later synthetic order edges happen to match history.
+    Repair("1014.json", 1014, 101401, -1, one(101209), (one(0),)),
+    Repair("1014.json", 1014, 101406, -1, one(101401), (one(101401),)),
+    Repair("1014.json", 1014, 101402, -1, one(101406), (one(101406),)),
+    Repair("1014.json", 1014, 101405, -1, one(101402), (one(101402),)),
+    Repair("1014.json", 1014, 101408, -1, one(101405), (one(101405),)),
+    Repair("1014.json", 1014, 101403, -1, one(101408), (one(101408),)),
+    Repair("1014.json", 1014, 101404, -1, one(101403), (one(101403),)),
+    Repair("1014.json", 1014, 101407, -1, one(101404), (one(101404),)),
 )
 
 base.REPAIRS += BRANCH_REPAIRS
