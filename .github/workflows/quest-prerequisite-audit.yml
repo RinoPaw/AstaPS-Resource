@@ -1,0 +1,60 @@
+name: Quest prerequisite audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/fix_quest_prerequisites.py"
+      - "tools/fix_liyue_prerequisites.py"
+      - "tools/fix_liyue_act1_branches.py"
+      - "tools/fix_liyue_chapter1102.py"
+      - "BinOutput/Quest/**.json"
+      - "ExcelBinOutput/QuestExcelConfigData.json"
+      - ".github/workflows/quest-prerequisite-audit.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile prerequisite tools
+        run: |
+          python -m py_compile \
+            tools/fix_quest_prerequisites.py \
+            tools/fix_liyue_prerequisites.py \
+            tools/fix_liyue_act1_branches.py \
+            tools/fix_liyue_chapter1102.py
+
+      - name: Validate Chapter 1102 manifest against current resources
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, "tools")
+          import fix_liyue_chapter1102 as entry
+          import fix_liyue_prerequisites as base
+
+          ids = [repair.sub_id for repair in base.REPAIRS]
+          assert len(ids) == 178, f"expected 178 repair rows, got {len(ids)}"
+          assert len(ids) == len(set(ids)), "duplicate subId in repair manifest"
+
+          source_status = base.patch_sources(Path("BinOutput/Quest"), check=True)
+          excel_status = base.patch_excel(
+              Path("ExcelBinOutput/QuestExcelConfigData.json"), check=True
+          )
+          assert source_status in (0, 1)
+          assert excel_status in (0, 1)
+          print(
+              "strict dry-check completed:",
+              f"source_pending={bool(source_status)}",
+              f"excel_pending={bool(excel_status)}",
+          )
+          PY
