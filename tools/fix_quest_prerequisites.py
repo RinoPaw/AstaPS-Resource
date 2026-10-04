@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-
 DEFAULT_PATH = Path("ExcelBinOutput/QuestExcelConfigData.json")
 STATE_EQUAL = "QUEST_COND_STATE_EQUAL"
 STATE_NOT_EQUAL = "QUEST_COND_STATE_NOT_EQUAL"
@@ -15,19 +14,11 @@ FINISHED = 3
 
 
 def state_equal(quest_id: int, state: int = FINISHED) -> dict:
-    return {
-        "type": STATE_EQUAL,
-        "param": [quest_id, state, 0],
-        "param_str": "",
-    }
+    return {"type": STATE_EQUAL, "param": [quest_id, state, 0], "param_str": ""}
 
 
 def state_not_equal(quest_id: int, state: int = FINISHED) -> dict:
-    return {
-        "type": STATE_NOT_EQUAL,
-        "param": [quest_id, state, 0],
-        "param_str": "",
-    }
+    return {"type": STATE_NOT_EQUAL, "param": [quest_id, state, 0], "param_str": ""}
 
 
 @dataclass(frozen=True)
@@ -45,17 +36,16 @@ def one(predecessor: int, *, state: int = FINISHED) -> tuple[dict, ...]:
     return (state_equal(predecessor, state),)
 
 
-# Concrete 7.1 conversion defects recovered from intact historical BinOutput. These rows deliberately
-# cover more than zeroed predecessors: the converter also sequentialized parallel nodes and dropped
-# additional conditions from compound accepts. Every repair names the exact damaged shape observed
-# or the [0, FINISHED] shape produced when the source acceptCond was lost. A negative desc_hash means
-# the quest identity (json_file + main_id + sub_id) is the safety key because text hashes drift by
-# small offsets across resource revisions; the accept-condition shape is still validated strictly.
+# Evidence: intact historical BinOutput for the same Mondstadt quest graph.
+# A negative desc_hash means json_file + main_id + sub_id is used as the identity key; this is
+# intentional for rows whose text hashes drift slightly between resource revisions. The current
+# accept-condition shape is still checked strictly before any rewrite.
 REPAIRS = (
+    # Fresh-player / Prologue Act I entry.
     Repair("351.json", 351, 35101, 3236261087, one(35100), (one(35107),)),
     Repair("352.json", 352, 35200, 2150333847, one(35102), (one(0),)),
 
-    # Prologue Act I: early Mondstadt graph.
+    # Prologue Act I visible chain.
     Repair("354.json", 354, 35401, 2564565335, one(35505), (one(0),)),
     Repair("354.json", 354, 35403, 1527152647, one(35404), (one(35405),)),
     Repair("355.json", 355, 35501, 1480972647, one(35311), (one(0),)),
@@ -73,14 +63,14 @@ REPAIRS = (
     Repair("357.json", 357, 35721, 401722439, one(35606), (one(0),)),
     Repair("358.json", 358, 35800, 2056537383, one(35724), (one(0),)),
 
-    # Temple branches fan out from 35802; the converted dump lost each cross-main predecessor.
+    # Three temple branches plus the hidden completion controller fan out from 35802.
     Repair("306.json", 306, 30600, 447310999, one(35802), (one(0),)),
     Repair("307.json", 307, 30700, 4264103487, one(35802), (one(0),)),
     Repair("308.json", 308, 30800, 4078363583, one(35802), (one(0),)),
     Repair("309.json", 309, 30901, 2918457247, one(35802), (one(0),)),
     Repair("311.json", 311, 31101, 486980247, one(30904), (one(0),)),
 
-    # Hidden Act-I controllers. 35902/03/04 are parallel branches from 35802 in intact data.
+    # Hidden Act-I controllers / non-linear nodes.
     Repair("359.json", 359, 35901, 1736464775, one(35725), (one(0),)),
     Repair("359.json", 359, 35902, 206764287, one(35802), (one(35901),)),
     Repair("359.json", 359, 35903, 4126557215, one(35802), (one(35902),)),
@@ -98,12 +88,11 @@ REPAIRS = (
         expected_comb="LOGIC_AND",
     ),
 
-    # Chapter 1001 controller: starts the "The Outlander Who Caught the Wind" banner.
+    # Chapter 1001 controller -> ChapterStateNotify(1001, BEGIN).
     Repair("363.json", 363, 36301, 0, one(35202), (one(0),)),
 
-    # Prologue Act II handoff and chapter path.
+    # Prologue Act II.
     Repair("370.json", 370, 37001, 984138423, one(31101), (one(0),)),
-    # Hidden trigger 37003 is active while 37005 is UNFINISHED (state 2).
     Repair("370.json", 370, 37003, 411942639, one(37005, state=2), (one(37005),)),
     Repair("371.json", 371, 37101, 3416483463, one(37005), (one(0),)),
     Repair("372.json", 372, 37201, -1, one(37113), (one(0),)),
@@ -112,14 +101,12 @@ REPAIRS = (
     Repair("375.json", 375, 37501, -1, one(37406), (one(0),)),
     Repair("376.json", 376, 37601, -1, one(37506), (one(0),)),
     Repair("377.json", 377, 37701, -1, one(37608), (one(0),)),
-    # The Lisa temple/character-quest bridge remains part of series/chapter 1002.
+    # Lisa's temple bridge is still in series/chapter 1002.
     Repair("20101.json", 20101, 2010100, -1, one(37706), (one(0),)),
     Repair("379.json", 379, 37901, -1, one(2010151), (one(0),)),
-    # Three parallel temple branches all open from 37904.
     Repair("380.json", 380, 38001, -1, one(37904), (one(0),)),
     Repair("381.json", 381, 38101, -1, one(37904), (one(0),)),
     Repair("382.json", 382, 38201, -1, one(37904), (one(0),)),
-    # 38301 is the convergence barrier: all three branches must be finished.
     Repair(
         "383.json",
         383,
@@ -131,18 +118,24 @@ REPAIRS = (
     ),
     Repair("384.json", 384, 38401, -1, one(38304), (one(0),)),
 
-    # Prologue Act III opening handoff.
+    # Prologue Act III.
     Repair("397.json", 397, 39701, 619581215, one(38406), (one(0),)),
+    Repair("388.json", 388, 38806, -1, one(39704), (one(0),)),
+    Repair("389.json", 389, 38901, -1, one(38804), (one(0),)),
+    Repair("390.json", 390, 39003, -1, one(38906), (one(0),)),
+    Repair("393.json", 393, 39301, -1, one(39008), (one(0),)),
+    Repair("394.json", 394, 39401, -1, one(39303), (one(0),)),
+    Repair("398.json", 398, 39810, -1, one(39402), (one(0),)),
+    Repair("396.json", 396, 39601, -1, one(39808), (one(0),)),
+    Repair("399.json", 399, 39901, -1, one(39812), (one(0),)),
 )
 
 
 def iter_top_level_objects(text: str):
-    """Yield (start, end) slices for objects in the top-level JSON array."""
     depth = 0
     in_string = False
     escaped = False
     start = None
-
     for i, ch in enumerate(text):
         if in_string:
             if escaped:
@@ -152,7 +145,6 @@ def iter_top_level_objects(text: str):
             elif ch == '"':
                 in_string = False
             continue
-
         if ch == '"':
             in_string = True
         elif ch == "{":
@@ -166,7 +158,6 @@ def iter_top_level_objects(text: str):
             if depth == 0 and start is not None:
                 yield start, i + 1
                 start = None
-
     if in_string:
         raise ValueError("Unterminated JSON string")
     if depth != 0:
@@ -184,8 +175,6 @@ def normalize_condition(entry: dict) -> dict:
     if not isinstance(params, list):
         params = []
     if entry.get("type") in (STATE_EQUAL, STATE_NOT_EQUAL) and len(params) >= 2:
-        # Historical fixed-width data retains an unused trailing zero; the flattened 7.1 dump often
-        # omits it. AstaPS's state comparison reads only quest id and state.
         params = params[:2]
     return {
         "type": entry.get("type"),
@@ -215,7 +204,6 @@ def identify_repair(obj: dict) -> Repair | None:
 
 
 def render_object(obj: dict) -> str:
-    """Render one list element with the repository's two-space outer indentation."""
     raw = json.dumps(obj, ensure_ascii=False, indent=2)
     lines = raw.splitlines()
     return lines[0] + "\n" + "\n".join("  " + line for line in lines[1:])
@@ -255,7 +243,6 @@ def patch_object(raw: str, repair: Repair) -> tuple[str, str, list[str]]:
     if not changes:
         return raw, "already-correct", []
 
-    # Reformat only this quest row, not the multi-million-line generated resource.
     patched = render_object(obj)
     parsed = json.loads(patched)
     if normalize_accept(parsed.get("acceptCond")) != expected:
@@ -269,17 +256,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Repair evidence-backed 7.1 quest prerequisite conversion defects."
     )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        type=Path,
-        default=DEFAULT_PATH,
-        help=f"QuestExcelConfigData.json path (default: {DEFAULT_PATH})",
-    )
+    parser.add_argument("path", nargs="?", type=Path, default=DEFAULT_PATH)
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Validate the known rows and report pending repairs without writing the file.",
+        help="Validate known rows and report pending repairs without writing.",
     )
     args = parser.parse_args()
 
@@ -305,13 +286,11 @@ def main() -> int:
         obj = json.loads(raw)
         if not isinstance(obj, dict):
             continue
-
         repair = identify_repair(obj)
         if repair is None:
             continue
         if repair.sub_id in found:
             raise SystemExit(f"Quest {repair.sub_id} appears more than once in {path}")
-
         patched, status, changes = patch_object(raw, repair)
         found[repair.sub_id] = (status, changes)
         if status == "changed":
@@ -342,9 +321,6 @@ def main() -> int:
         patched_text = patched_text[:start] + patched + patched_text[end:]
 
     parsed = json.loads(patched_text)
-    if not isinstance(parsed, list):
-        raise SystemExit("Patched resource unexpectedly stopped being a JSON array")
-
     target_ids = {repair.sub_id for repair in REPAIRS}
     by_sub_id = {
         int(obj.get("subId") or 0): obj
@@ -363,7 +339,6 @@ def main() -> int:
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(patched_text, encoding="utf-8", newline="")
     os.replace(tmp, path)
-
     print(f"Updated: {path}")
     print(f"Repaired quest rows: {len(replacements)}")
     return 0
