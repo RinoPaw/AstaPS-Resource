@@ -1,0 +1,71 @@
+name: Extend prerequisite combiner repair model
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/extend-prerequisite-combiner-repair.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Add strict damaged-combiner whitelist support
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          quest = Path("tools/fix_quest_prerequisites.py")
+          text = quest.read_text(encoding="utf-8")
+          old = '''    expected_comb: str | None = None\n'''
+          new = '''    expected_comb: str | None = None\n    damaged_comb: tuple[str, ...] = ()\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+
+          old = '''        elif current_comb in (None, "", "LOGIC_NONE"):\n            obj["acceptCondComb"] = repair.expected_comb\n            changes.append(f"acceptCondComb={repair.expected_comb}")\n        else:\n            raise ValueError(\n                f"Quest {repair.sub_id} has unexpected acceptCondComb={current_comb!r}; "\n                f"expected missing or {repair.expected_comb}"\n            )\n'''
+          new = '''        elif current_comb in (None, "", "LOGIC_NONE") or current_comb in repair.damaged_comb:\n            obj["acceptCondComb"] = repair.expected_comb\n            changes.append(f"acceptCondComb={repair.expected_comb}")\n        else:\n            raise ValueError(\n                f"Quest {repair.sub_id} has unexpected acceptCondComb={current_comb!r}; "\n                f"expected {repair.expected_comb!r}, missing, or one of damaged variants "\n                f"{repair.damaged_comb!r}"\n            )\n'''
+          assert text.count(old) == 1
+          quest.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          liyue = Path("tools/fix_liyue_prerequisites.py")
+          text = liyue.read_text(encoding="utf-8")
+          old = '''        elif current_comb in (None, "", "LOGIC_NONE"):\n            row["acceptCondComb"] = repair.expected_comb\n            changes.append(f"acceptCondComb={repair.expected_comb}")\n        else:\n            raise ValueError(\n                f"Quest {repair.sub_id} has unexpected source acceptCondComb={current_comb!r}; "\n                f"expected missing or {repair.expected_comb}"\n            )\n'''
+          new = '''        elif current_comb in (None, "", "LOGIC_NONE") or current_comb in repair.damaged_comb:\n            row["acceptCondComb"] = repair.expected_comb\n            changes.append(f"acceptCondComb={repair.expected_comb}")\n        else:\n            raise ValueError(\n                f"Quest {repair.sub_id} has unexpected source acceptCondComb={current_comb!r}; "\n                f"expected {repair.expected_comb!r}, missing, or one of damaged variants "\n                f"{repair.damaged_comb!r}"\n            )\n'''
+          assert text.count(old) == 1
+          liyue.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          python -m py_compile tools/fix_quest_prerequisites.py tools/fix_liyue_prerequisites.py
+          git diff --check
+
+      - name: Verify modified path allowlist
+        run: |
+          python - <<'PY'
+          import subprocess
+          expected = {"tools/fix_quest_prerequisites.py", "tools/fix_liyue_prerequisites.py"}
+          changed = set(subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines())
+          assert changed == expected, f"expected {sorted(expected)}, got {sorted(changed)}"
+          PY
+
+      - name: Commit strict combiner support
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/fix_quest_prerequisites.py tools/fix_liyue_prerequisites.py
+          git commit -m "tools: support explicit damaged prerequisite combiners [skip ci]"
+          git push origin HEAD:main
