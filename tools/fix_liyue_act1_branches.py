@@ -4,7 +4,7 @@ from __future__ import annotations
 import fix_liyue_prerequisites as base
 from fix_quest_prerequisites import Repair, one, state_equal
 
-# Liyue Act I branch / convergence extension plus the Chapter 1102 entry.
+# Early Liyue branch / convergence repairs through Chapter 1102.
 #
 # Evidence:
 # - GCResource 3.7 and 4.0 agree on these prerequisite graphs.
@@ -79,6 +79,104 @@ BRANCH_REPAIRS = (
     Repair("1010.json", 1010, 101008, -1, one(101007), (one(101007),)),
     Repair("1010.json", 1010, 101005, -1, one(101008), (one(101008),)),
     Repair("1010.json", 1010, 101006, -1, one(101005), (one(101005),)),
+
+    # MQ1011: Chapter 1102 incense / cleansing sequence.
+    # 101127 is a hidden progress controller. Many sibling steps require both a
+    # concrete predecessor to be FINISHED and 101127 to remain ACTIVE (state 2).
+    Repair("1011.json", 1011, 101101, -1, one(101006), (one(0),)),
+    Repair("1011.json", 1011, 101116, -1, one(101101), (one(101101),)),
+    Repair("1011.json", 1011, 101102, -1, one(101101), (one(101116),)),
+    Repair("1011.json", 1011, 101103, -1, one(101102), (one(101102),)),
+    Repair("1011.json", 1011, 101112, -1, one(101103), (one(101103),)),
+    Repair("1011.json", 1011, 101104, -1, one(101112), (one(101112),)),
+    Repair("1011.json", 1011, 101128, -1, one(101112), (one(101104),)),
+    Repair(
+        "1011.json",
+        1011,
+        101105,
+        -1,
+        (state_equal(101104), state_equal(101127, state=2)),
+        (one(101128),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101123,
+        -1,
+        (state_equal(101104), state_equal(101127, state=2)),
+        (one(101105),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101113,
+        -1,
+        (state_equal(101123), state_equal(101127, state=2)),
+        (one(101123),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101124,
+        -1,
+        (state_equal(101104), state_equal(101127, state=2)),
+        (one(101113),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101114,
+        -1,
+        (state_equal(101124), state_equal(101127, state=2)),
+        (one(101124),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101125,
+        -1,
+        (state_equal(101104), state_equal(101127, state=2)),
+        (one(101114),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101115,
+        -1,
+        (state_equal(101125), state_equal(101127, state=2)),
+        (one(101125),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101126,
+        -1,
+        (state_equal(101104), state_equal(101127, state=2)),
+        (one(101115),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair(
+        "1011.json",
+        1011,
+        101106,
+        -1,
+        (state_equal(101126), state_equal(101127, state=2)),
+        (one(101126),),
+        expected_comb="LOGIC_AND",
+    ),
+    Repair("1011.json", 1011, 101127, -1, one(101104), (one(101106),)),
+    Repair("1011.json", 1011, 101110, -1, one(101127), (one(101127),)),
+    Repair("1011.json", 1011, 101111, -1, one(101127), (one(101110),)),
+    Repair("1011.json", 1011, 101107, -1, one(101127), (one(101111),)),
+    Repair("1011.json", 1011, 101108, -1, one(101107), (one(101107),)),
+    Repair("1011.json", 1011, 101109, -1, one(101108), (one(101108),)),
 )
 
 base.REPAIRS += BRANCH_REPAIRS
