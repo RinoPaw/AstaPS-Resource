@@ -130,6 +130,138 @@ REPAIRS = (
     Repair("399.json", 399, 39901, -1, one(39812), (one(0),)),
 )
 
+# Residual Mondstadt Prologue prerequisite graph repairs.
+# Evidence: exact normalized acceptCond + acceptCondComb consensus in GCResource 3.7 and 4.0.
+# These are kept separate from the first evidence batch so the consensus provenance stays explicit.
+REPAIRS += (
+    # 306.json
+    Repair("306.json", 306, 30608, -1, one(30602), (one(30607),)),
+    Repair("306.json", 306, 30609, -1, one(30602), (one(30608),)),
+    Repair("306.json", 306, 30612, -1, one(30602), (one(30609),)),
+    Repair("306.json", 306, 30611, -1, one(30602), (one(30612),)),
+    Repair("306.json", 306, 30603, -1, one(30602), (one(30611),)),
+    Repair("306.json", 306, 30604, -1, one(30603), (one(30610),)),
+
+    # 307.json
+    Repair("307.json", 307, 30707, -1, one(30702), (one(30710),)),
+    Repair("307.json", 307, 30708, -1, one(30702), (one(30707),)),
+    Repair("307.json", 307, 30709, -1, one(30702), (one(30708),)),
+    Repair("307.json", 307, 30712, -1, one(30702), (one(30709),)),
+    Repair("307.json", 307, 30711, -1, one(30702), (one(30712),)),
+    Repair("307.json", 307, 30703, -1, one(30702), (one(30711),)),
+
+    # 308.json
+    Repair("308.json", 308, 30807, -1, one(30802), (one(30810),)),
+    Repair("308.json", 308, 30808, -1, one(30802), (one(30807),)),
+    Repair("308.json", 308, 30809, -1, one(30802), (one(30808),)),
+    Repair("308.json", 308, 30812, -1, one(30802), (one(30809),)),
+    Repair("308.json", 308, 30811, -1, one(30802), (one(30812),)),
+    Repair("308.json", 308, 30803, -1, one(30802), (one(30811),)),
+    Repair("308.json", 308, 30804, -1, one(30803), (one(30814),)),
+
+    # 351.json
+    Repair("351.json", 351, 35104, -1, (), (one(0),)),
+    Repair("351.json", 351, 35103, -1, (state_equal(35106), state_not_equal(35105), state_not_equal(35105)), (one(35105),), expected_comb="LOGIC_AND"),
+    Repair("351.json", 351, 35102, -1, (state_equal(35103), state_equal(35105), state_equal(35105)), (one(35103),), expected_comb="LOGIC_OR"),
+
+    # 353.json
+    Repair("353.json", 353, 35301, -1, one(35205), (one(0),)),
+    Repair("353.json", 353, 35312, -1, one(35205), (one(35301),)),
+    Repair("353.json", 353, 35302, -1, one(35301), (one(35312),)),
+
+    # 371.json
+    Repair("371.json", 371, 37114, -1, one(37108), (one(37113),)),
+    Repair("371.json", 371, 37115, -1, (state_equal(37114), state_not_equal(37109)), (one(37114),), expected_comb="LOGIC_AND"),
+
+    # 374.json
+    Repair("374.json", 374, 37407, -1, one(37304), (one(37408),)),
+
+    # 375.json
+    Repair("375.json", 375, 37504, -1, one(37503, state=4), (one(37503),)),
+    Repair("375.json", 375, 37505, -1, one(37503), (one(37504),)),
+
+    # 376.json
+    Repair("376.json", 376, 37603, -1, one(37602, state=4), (one(37602),)),
+    Repair("376.json", 376, 37604, -1, one(37602), (one(37603),)),
+
+    # 20101.json
+    Repair("20101.json", 20101, 2010101, -1, one(37706), (one(2010100),)),
+    Repair("20101.json", 20101, 2010105, -1, one(2010144), (one(2010104),)),
+    Repair("20101.json", 20101, 2010106, -1, one(2010144), (one(2010105),)),
+    Repair("20101.json", 20101, 2010107, -1, one(2010144), (one(2010106),)),
+    Repair("20101.json", 20101, 2010108, -1, one(2010144), (one(2010107),)),
+    Repair("20101.json", 20101, 2010109, -1, one(2010144), (one(2010108),)),
+    Repair("20101.json", 20101, 2010110, -1, one(2010144), (one(2010109),)),
+    Repair("20101.json", 20101, 2010113, -1, (state_equal(2010112), state_equal(2010109)), (one(2010112),), expected_comb="LOGIC_OR"),
+    Repair("20101.json", 20101, 2010145, -1, one(2010109), (one(2010113),)),
+    Repair("20101.json", 20101, 2010146, -1, one(2010112), (one(2010145),)),
+    Repair("20101.json", 20101, 2010153, -1, one(2010144), (one(2010146),)),
+    Repair("20101.json", 20101, 2010154, -1, one(2010144), (one(2010153),)),
+    Repair("20101.json", 20101, 2010155, -1, one(2010144), (one(2010154),)),
+    Repair("20101.json", 20101, 2010156, -1, one(2010144), (one(2010155),)),
+    Repair("20101.json", 20101, 2010157, -1, one(2010144), (one(2010156),)),
+    Repair("20101.json", 20101, 2010114, -1, one(2010144), (one(2010157),)),
+    Repair("20101.json", 20101, 2010115, -1, one(2010144), (one(2010114),)),
+    Repair("20101.json", 20101, 2010116, -1, one(2010144), (one(2010115),)),
+    Repair("20101.json", 20101, 2010117, -1, one(2010144), (one(2010116),)),
+    Repair("20101.json", 20101, 2010118, -1, one(2010144), (one(2010117),)),
+    Repair("20101.json", 20101, 2010119, -1, one(2010144), (one(2010118),)),
+    Repair("20101.json", 20101, 2010120, -1, one(2010144), (one(2010119),)),
+    Repair("20101.json", 20101, 2010123, -1, (state_equal(2010122), state_equal(2010119)), (one(2010122),), expected_comb="LOGIC_OR"),
+    Repair("20101.json", 20101, 2010147, -1, one(2010119), (one(2010123),)),
+    Repair("20101.json", 20101, 2010148, -1, one(2010122), (one(2010147),)),
+    Repair("20101.json", 20101, 2010158, -1, one(2010144), (one(2010148),)),
+    Repair("20101.json", 20101, 2010159, -1, one(2010144), (one(2010158),)),
+    Repair("20101.json", 20101, 2010160, -1, one(2010144), (one(2010159),)),
+    Repair("20101.json", 20101, 2010149, -1, one(2010144), (one(0),)),
+    Repair("20101.json", 20101, 2010150, -1, one(2010144), (one(2010149),)),
+    Repair("20101.json", 20101, 2010134, -1, one(2010144), (one(2010150),)),
+    Repair("20101.json", 20101, 2010135, -1, one(2010144), (one(2010134),)),
+    Repair("20101.json", 20101, 2010138, -1, one(2010144), (one(0),)),
+    Repair("20101.json", 20101, 2010139, -1, one(2010144), (one(2010138),)),
+    Repair("20101.json", 20101, 2010140, -1, one(2010144), (one(2010139),)),
+    Repair("20101.json", 20101, 2010141, -1, one(2010144), (one(2010140),)),
+    Repair("20101.json", 20101, 2010124, -1, one(99902), (one(0),)),
+    Repair("20101.json", 20101, 2010126, -1, one(2010124), (one(2010125),)),
+    Repair("20101.json", 20101, 2010127, -1, one(2010124), (one(2010126),)),
+    Repair("20101.json", 20101, 2010128, -1, one(2010124), (one(2010127),)),
+    Repair("20101.json", 20101, 2010129, -1, one(2010124), (one(2010128),)),
+    Repair("20101.json", 20101, 2010130, -1, one(2010124), (one(2010129),)),
+    Repair("20101.json", 20101, 2010133, -1, (state_equal(2010132), state_equal(2010129)), (one(2010132),), expected_comb="LOGIC_OR"),
+    Repair("20101.json", 20101, 2010136, -1, one(99902), (one(2010133),)),
+
+    # 388.json
+    Repair("388.json", 388, 38805, -1, one(38802, state=4), (one(38802),)),
+    Repair("388.json", 388, 38803, -1, one(38802), (one(38805),)),
+
+    # 389.json
+    Repair("389.json", 389, 38902, -1, one(38804), (one(38901),)),
+
+    # 390.json
+    Repair("390.json", 390, 39006, -1, one(39004), (one(39005),)),
+    Repair("390.json", 390, 39007, -1, one(39004), (one(39006),)),
+    Repair("390.json", 390, 39008, -1, one(39004), (one(39007),)),
+    Repair("390.json", 390, 39009, -1, one(39004), (one(39008),)),
+
+    # 394.json
+    Repair("394.json", 394, 39405, -1, one(39402), (one(39403),)),
+
+    # 396.json
+    Repair("396.json", 396, 39607, -1, one(39605), (one(39604),)),
+
+    # 398.json
+    Repair("398.json", 398, 39814, -1, one(39810), (one(39812),)),
+    Repair("398.json", 398, 39811, -1, one(39812), (one(39814),)),
+    Repair("398.json", 398, 39801, -1, one(39402), (one(39811),)),
+    Repair("398.json", 398, 39805, -1, one(99902), (one(39804),)),
+    Repair("398.json", 398, 39806, -1, one(99902), (one(39805),)),
+    Repair("398.json", 398, 39807, -1, one(39804), (one(39806),)),
+    Repair("398.json", 398, 39815, -1, one(99902), (one(39807),)),
+    Repair("398.json", 398, 39808, -1, one(39807), (one(39815),)),
+    Repair("398.json", 398, 39813, -1, one(39808), (one(39816),)),
+    Repair("398.json", 398, 39809, -1, one(39808), (one(39813),)),
+)
+
 
 def iter_top_level_objects(text: str):
     depth = 0
