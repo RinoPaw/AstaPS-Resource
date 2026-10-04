@@ -1,0 +1,30 @@
+name: tmp quest352 slime discovery
+on:
+  push:
+    paths:
+      - '.github/workflows/tmp-quest352-slime-discovery.yml'
+  workflow_dispatch:
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            Scripts/Scene/3
+          sparse-checkout-cone-mode: true
+      - name: Find quest 352 script references
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== quest ids / plot ids ==='
+          grep -R -n -E '3520[0-5]|35216|1172' Scripts/Scene/3 || true
+          echo '=== trigger fire 1003 context ==='
+          grep -R -n -E '1003|QUEST_CONTENT_TRIGGER_FIRE' Scripts/Scene/3 | head -400 || true
+          echo '=== Starfell slime create calls near quest refs ==='
+          files=$(grep -R -l -E '3520[0-5]|35216|1172' Scripts/Scene/3 || true)
+          for f in $files; do
+            echo "--- $f ---"
+            grep -n -C 12 -E '3520[0-5]|35216|1172|CreateMonster|monster|MONSTER|QUEST' "$f" || true
+          done
