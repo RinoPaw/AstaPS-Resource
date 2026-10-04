@@ -19,10 +19,10 @@ from fix_quest_prerequisites import Repair, one, state_equal
 CHAPTER_1102_FINALE_REPAIRS = (
     # MQ1015: production sequence after the bargaining finale.
     # 101516 is an independent hidden controller rooted at 99902 and shares
-    # order=3 with 101509; it must not be inserted into the visible linear chain.
+    # order=3 with 101509; the current flattened resource serializes it as [0,3].
     Repair("1015.json", 1015, 101501, -1, one(101320), (one(0),)),
     Repair("1015.json", 1015, 101513, -1, one(101501), (one(101501),)),
-    Repair("1015.json", 1015, 101516, -1, one(99902), (one(101513),)),
+    Repair("1015.json", 1015, 101516, -1, one(99902), (one(0),)),
     Repair("1015.json", 1015, 101509, -1, one(101513), (one(101516),)),
     Repair("1015.json", 1015, 101502, -1, one(101509), (one(101509),)),
     Repair("1015.json", 1015, 101508, -1, one(101502), (one(101502),)),
