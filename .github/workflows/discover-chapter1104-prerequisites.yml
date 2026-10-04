@@ -1,0 +1,128 @@
+name: Discover Chapter 1104 prerequisites
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/discover-chapter1104-prerequisites.yml"
+  workflow_dispatch:
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout current resource subset
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+            ExcelBinOutput/QuestExcelConfigData.json
+            ExcelBinOutput/ChapterExcelConfigData.json
+            ExcelBinOutput/MainQuestExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 quest subset
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+
+      - name: Checkout GCResource 4.0 quest subset
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8001.json
+            BinOutput/Quest/8002.json
+            BinOutput/Quest/8003.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify tool and reference identity
+        run: |
+          python -m py_compile tools/audit_quest_prerequisite_drift.py tools/filter_quest_prerequisite_consensus.py
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          for name in ("8000.json", "8001.json", "8002.json", "8003.json"):
+              a = Path("ref3700/BinOutput/Quest") / name
+              b = Path("ref4000/BinOutput/Quest") / name
+              ah = hashlib.sha256(a.read_bytes()).hexdigest()
+              bh = hashlib.sha256(b.read_bytes()).hexdigest()
+              assert ah == bh, f"historical reference mismatch for {name}: {ah} != {bh}"
+              print(f"reference-identical {name} {ah[:16]}")
+          PY
+
+      - name: Audit flattened Chapter 1104 graph
+        run: |
+          python tools/audit_quest_prerequisite_drift.py \
+            --reference-bin-root ref3700/BinOutput/Quest \
+            --reference-bin-root ref4000/BinOutput/Quest \
+            --main 8000 --main 8001 --main 8002 --main 8003 \
+            --only-differences \
+            --json chapter1104-audit.json
+
+          python tools/filter_quest_prerequisite_consensus.py \
+            chapter1104-audit.json \
+            --main 8000 --main 8001 --main 8002 --main 8003 \
+            --consensus-count 2 \
+            --json chapter1104-consensus.json
+
+      - name: Audit current BinOutput source loss
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def meaningful(row):
+              value = row.get("acceptCond")
+              if not isinstance(value, list):
+                  return []
+              return [x for x in value if isinstance(x, dict) and x.get("type")]
+
+          total = 0
+          source_missing = 0
+          source_match = 0
+          source_other = 0
+          for main_id in (8000, 8001, 8002, 8003):
+              cur = json.loads((Path("BinOutput/Quest") / f"{main_id}.json").read_text(encoding="utf-8"))
+              ref = json.loads((Path("ref3700/BinOutput/Quest") / f"{main_id}.json").read_text(encoding="utf-8"))
+              cur_by_id = {int(x["subId"]): x for x in cur.get("subQuests", [])}
+              for expected in ref.get("subQuests", []):
+                  sid = int(expected["subId"])
+                  current = cur_by_id[sid]
+                  exp = meaningful(expected)
+                  got = meaningful(current)
+                  total += 1
+                  if got == exp:
+                      source_match += 1
+                  elif not got and exp:
+                      source_missing += 1
+                  else:
+                      source_other += 1
+                      print(f"source-other main={main_id} sub={sid} current={got!r} expected={exp!r}")
+          print(f"source-summary total={total} match={source_match} missing={source_missing} other={source_other}")
+          assert source_other == 0
+          PY
