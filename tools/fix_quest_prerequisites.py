@@ -27,6 +27,7 @@ class Repair:
 # These are concrete 7.1 conversion defects recovered from intact historical BinOutput.
 # Keep this list evidence-backed and deliberately non-generic.
 REPAIRS = (
+    # Early Mondstadt onboarding / Prologue Act I.
     Repair(
         json_file="351.json",
         main_id=351,
@@ -50,6 +51,112 @@ REPAIRS = (
         desc_hash=0,
         broken_predecessor=0,
         correct_predecessor=35202,
+    ),
+    Repair(
+        json_file="355.json",
+        main_id=355,
+        sub_id=35501,
+        desc_hash=1480972647,
+        broken_predecessor=0,
+        correct_predecessor=35311,
+    ),
+    Repair(
+        json_file="354.json",
+        main_id=354,
+        sub_id=35401,
+        desc_hash=2564565335,
+        broken_predecessor=0,
+        correct_predecessor=35505,
+    ),
+    Repair(
+        json_file="360.json",
+        main_id=360,
+        sub_id=36001,
+        desc_hash=4087620839,
+        broken_predecessor=0,
+        correct_predecessor=35403,
+    ),
+    Repair(
+        json_file="356.json",
+        main_id=356,
+        sub_id=35601,
+        desc_hash=1893185559,
+        broken_predecessor=0,
+        correct_predecessor=36005,
+    ),
+    Repair(
+        json_file="357.json",
+        main_id=357,
+        sub_id=35721,
+        desc_hash=401722439,
+        broken_predecessor=0,
+        correct_predecessor=35606,
+    ),
+    Repair(
+        json_file="358.json",
+        main_id=358,
+        sub_id=35800,
+        desc_hash=2056537383,
+        broken_predecessor=0,
+        correct_predecessor=35724,
+    ),
+    # The three temple branches and the hidden completion controller all fan out from 35802.
+    Repair(
+        json_file="306.json",
+        main_id=306,
+        sub_id=30600,
+        desc_hash=447310999,
+        broken_predecessor=0,
+        correct_predecessor=35802,
+    ),
+    Repair(
+        json_file="307.json",
+        main_id=307,
+        sub_id=30700,
+        desc_hash=4264103487,
+        broken_predecessor=0,
+        correct_predecessor=35802,
+    ),
+    Repair(
+        json_file="308.json",
+        main_id=308,
+        sub_id=30800,
+        desc_hash=4078363583,
+        broken_predecessor=0,
+        correct_predecessor=35802,
+    ),
+    Repair(
+        json_file="309.json",
+        main_id=309,
+        sub_id=30901,
+        desc_hash=2918457247,
+        broken_predecessor=0,
+        correct_predecessor=35802,
+    ),
+    Repair(
+        json_file="311.json",
+        main_id=311,
+        sub_id=31101,
+        desc_hash=486980247,
+        broken_predecessor=0,
+        correct_predecessor=30904,
+    ),
+    # Prologue Act II and III entry handoffs.
+    Repair(
+        json_file="370.json",
+        main_id=370,
+        sub_id=37001,
+        desc_hash=984138423,
+        broken_predecessor=0,
+        correct_predecessor=31101,
+    ),
+    Repair(
+        json_file="397.json",
+        main_id=397,
+        sub_id=39701,
+        desc_hash=619581215,
+        broken_predecessor=0,
+        correct_predecessor=38406,
     ),
 )
 
