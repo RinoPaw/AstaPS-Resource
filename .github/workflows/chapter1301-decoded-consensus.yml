@@ -75,6 +75,7 @@ jobs:
 
           MAINS = range(3000, 3007)
           DEFAULT_COMBS = {None, "", "LOGIC_NONE"}
+          QUEST_GLOBAL_VAR_EQUAL = "QUEST_COND_QUEST_GLOBAL_VAR_EQUAL"
 
           def load(path):
               return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -94,6 +95,15 @@ jobs:
                       return value
               return value
 
+          def normalize_params(cond_type, params):
+              normalized = [normalize_scalar(v) for v in params]
+              # The 3.7-era TSV exporter omits a trailing zero for
+              # QUEST_COND_QUEST_GLOBAL_VAR_EQUAL. Later decoded snapshots
+              # (including 4.6) preserve the schema's [var_id, value] pair.
+              if cond_type == QUEST_GLOBAL_VAR_EQUAL and len(normalized) == 1:
+                  normalized.append(0)
+              return normalized
+
           def normalize_accept(row):
               out = []
               value = row.get("acceptCond")
@@ -105,9 +115,10 @@ jobs:
                   params = cond.get("param", [])
                   if not isinstance(params, list):
                       params = []
+                  cond_type = cond["type"]
                   out.append({
-                      "type": cond["type"],
-                      "param": [normalize_scalar(v) for v in params],
+                      "type": cond_type,
+                      "param": normalize_params(cond_type, params),
                   })
               return out
 
