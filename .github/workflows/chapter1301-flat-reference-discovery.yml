@@ -1,0 +1,248 @@
+name: Inspect Chapter 1301 historical flattened prerequisites
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/chapter1301-flat-reference-discovery.yml"
+  workflow_dispatch:
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current QuestExcel
+        uses: actions/checkout@v4
+        with:
+          path: current
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Checkout GCResource 3.7 flattened QuestExcel
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Checkout GCResource 4.0 flattened QuestExcel
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compare Chapter 1301 flattened prerequisite semantics
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          MAINS = set(range(3000, 3007))
+          STATE_TYPES = {"QUEST_COND_STATE_EQUAL", "QUEST_COND_STATE_NOT_EQUAL"}
+          UNKNOWN = "QUEST_COND_UNKNOWN"
+
+          def load(path):
+              with Path(path).open("r", encoding="utf-8") as fp:
+                  return json.load(fp)
+
+          def meaningful(value):
+              if not isinstance(value, list):
+                  return []
+              return [x for x in value if isinstance(x, dict) and x.get("type")]
+
+          def normalize_condition(entry):
+              params = entry.get("param", [])
+              if not isinstance(params, list):
+                  params = []
+              if entry.get("type") in STATE_TYPES and len(params) >= 2:
+                  params = params[:2]
+              return {
+                  "type": entry.get("type"),
+                  "param": params,
+                  "param_str": entry.get("param_str", entry.get("paramStr", "")) or "",
+              }
+
+          def accept(row):
+              return [normalize_condition(x) for x in meaningful(row.get("acceptCond"))]
+
+          def comb(row):
+              value = row.get("acceptCondComb")
+              return value if value not in (None, "", "LOGIC_NONE") else "LOGIC_AND"
+
+          def signature(row):
+              return (json.dumps(accept(row), sort_keys=True, ensure_ascii=False), comb(row))
+
+          def scoped_rows(document):
+              return {
+                  (int(row.get("mainId") or 0), int(row.get("subId") or 0)): row
+                  for row in document
+                  if isinstance(row, dict) and int(row.get("mainId") or 0) in MAINS
+              }
+
+          paths = {
+              "current": Path("current/ExcelBinOutput/QuestExcelConfigData.json"),
+              "3700": Path("ref3700/ExcelBinOutput/QuestExcelConfigData.json"),
+              "4000": Path("ref4000/ExcelBinOutput/QuestExcelConfigData.json"),
+          }
+          docs = {name: load(path) for name, path in paths.items()}
+          rows = {name: scoped_rows(doc) for name, doc in docs.items()}
+
+          for name, path in paths.items():
+              print(f"file {name}: sha256={hashlib.sha256(path.read_bytes()).hexdigest()[:20]} scoped_rows={len(rows[name])}")
+
+          all_keys = sorted(set(rows["3700"]) | set(rows["4000"]))
+          counts = Counter()
+          per_main = defaultdict(Counter)
+          type_counts = Counter()
+          comb_counts = Counter()
+          disagreements = []
+          partials = []
+          diffs = []
+          unsafe_unknown = []
+
+          for key in all_keys:
+              main_id, sub_id = key
+              r37 = rows["3700"].get(key)
+              r40 = rows["4000"].get(key)
+              cur = rows["current"].get(key)
+
+              if r37 is None or r40 is None:
+                  counts["partial-reference-coverage"] += 1
+                  per_main[main_id]["partial-reference-coverage"] += 1
+                  partials.append((key, r37 is not None, r40 is not None))
+                  continue
+
+              if signature(r37) != signature(r40):
+                  counts["reference-disagreement"] += 1
+                  per_main[main_id]["reference-disagreement"] += 1
+                  disagreements.append((key, accept(r37), comb(r37), accept(r40), comb(r40)))
+                  continue
+
+              expected = accept(r37)
+              expected_comb = comb(r37)
+              counts["dual-reference-consensus"] += 1
+              per_main[main_id]["dual-reference-consensus"] += 1
+              comb_counts[expected_comb] += 1
+              for cond in expected:
+                  type_counts[cond["type"]] += 1
+
+              if any(cond["type"] == UNKNOWN for cond in expected):
+                  counts["consensus-with-unknown"] += 1
+                  per_main[main_id]["consensus-with-unknown"] += 1
+                  unsafe_unknown.append((key, expected, expected_comb))
+              elif expected:
+                  counts["consensus-known-nonempty"] += 1
+                  per_main[main_id]["consensus-known-nonempty"] += 1
+              else:
+                  counts["consensus-empty"] += 1
+                  per_main[main_id]["consensus-empty"] += 1
+
+              if cur is None:
+                  counts["current-missing-row"] += 1
+                  per_main[main_id]["current-missing-row"] += 1
+                  diffs.append(("current-missing-row", key, None, None, expected, expected_comb))
+                  continue
+
+              current_accept = accept(cur)
+              current_comb = comb(cur)
+              if current_accept == expected and current_comb == expected_comb:
+                  counts["current-match"] += 1
+                  per_main[main_id]["current-match"] += 1
+              else:
+                  counts["current-drift"] += 1
+                  per_main[main_id]["current-drift"] += 1
+                  diffs.append(("current-drift", key, current_accept, current_comb, expected, expected_comb))
+
+          current_only = sorted(set(rows["current"]) - (set(rows["3700"]) | set(rows["4000"])))
+          counts["current-only-row"] = len(current_only)
+
+          print("\nSUMMARY")
+          for key, value in sorted(counts.items()):
+              print(f"  {key}: {value}")
+          print(f"  historical condition types: {dict(sorted(type_counts.items()))}")
+          print(f"  historical combiners: {dict(sorted(comb_counts.items()))}")
+          print(f"  current-only rows: {current_only}")
+
+          print("\nPER MAIN")
+          for main_id in sorted(MAINS):
+              print(f"  {main_id}: {dict(sorted(per_main[main_id].items()))}")
+
+          if partials:
+              print("\nPARTIAL REFERENCE COVERAGE")
+              for item in partials:
+                  print(item)
+
+          if disagreements:
+              print("\nREFERENCE DISAGREEMENTS")
+              for item in disagreements:
+                  print(json.dumps(item, ensure_ascii=False))
+
+          if unsafe_unknown:
+              print("\nCONSENSUS ROWS CONTAINING QUEST_COND_UNKNOWN")
+              for item in unsafe_unknown:
+                  print(json.dumps(item, ensure_ascii=False))
+
+          print("\nCURRENT DIFFERENCES")
+          for kind, key, cur_accept, cur_comb, ref_accept, ref_comb in diffs:
+              print(json.dumps({
+                  "classification": kind,
+                  "main_id": key[0],
+                  "sub_id": key[1],
+                  "current_accept": cur_accept,
+                  "current_comb": cur_comb,
+                  "reference_accept": ref_accept,
+                  "reference_comb": ref_comb,
+              }, ensure_ascii=False, sort_keys=True))
+
+          report = {
+              "counts": dict(sorted(counts.items())),
+              "per_main": {str(k): dict(sorted(v.items())) for k, v in sorted(per_main.items())},
+              "historical_condition_types": dict(sorted(type_counts.items())),
+              "historical_combiners": dict(sorted(comb_counts.items())),
+              "current_only_rows": [list(key) for key in current_only],
+              "reference_disagreements": [
+                  {
+                      "main_id": key[0], "sub_id": key[1],
+                      "accept_3700": a37, "comb_3700": c37,
+                      "accept_4000": a40, "comb_4000": c40,
+                  }
+                  for key, a37, c37, a40, c40 in disagreements
+              ],
+              "differences": [
+                  {
+                      "classification": kind,
+                      "main_id": key[0], "sub_id": key[1],
+                      "current_accept": cur_accept, "current_comb": cur_comb,
+                      "reference_accept": ref_accept, "reference_comb": ref_comb,
+                  }
+                  for kind, key, cur_accept, cur_comb, ref_accept, ref_comb in diffs
+              ],
+          }
+          Path("chapter1301-flat-reference-report.json").write_text(
+              json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: chapter1301-flat-reference-report
+          path: chapter1301-flat-reference-report.json
