@@ -1,0 +1,189 @@
+name: Chapter 1301 prerequisite discovery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/chapter1301-discovery.yml"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current 7.1 resources
+        uses: actions/checkout@v4
+        with:
+          path: current
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/audit_quest_prerequisite_drift.py
+            ExcelBinOutput/ChapterExcelConfigData.json
+            ExcelBinOutput/QuestExcelConfigData.json
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - name: Checkout GCResource 3.7
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "3700"
+          path: ref3700
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - name: Checkout GCResource 4.0
+        uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: "4000"
+          path: ref4000
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Audit flattened QuestExcel against dual-reference consensus
+        working-directory: current
+        run: |
+          python tools/audit_quest_prerequisite_drift.py \
+            ExcelBinOutput/QuestExcelConfigData.json \
+            --chapter-excel ExcelBinOutput/ChapterExcelConfigData.json \
+            --reference-bin-root ../ref3700/BinOutput/Quest \
+            --reference-bin-root ../ref4000/BinOutput/Quest \
+            --main 3000 --main 3001 --main 3002 --main 3003 \
+            --main 3004 --main 3005 --main 3006 \
+            --include-reference-only \
+            --only-differences \
+            --json ../chapter1301-questexcel-audit.json | tee ../chapter1301-questexcel-audit.txt
+
+      - name: Audit current BinOutput source rows against dual-reference consensus
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from collections import Counter
+          from pathlib import Path
+
+          sys.path.insert(0, "current/tools")
+          from audit_quest_prerequisite_drift import normalize_accept, normalize_comb, reference_signature
+
+          mains = range(3000, 3007)
+          current_root = Path("current/BinOutput/Quest")
+          reference_roots = [Path("ref3700/BinOutput/Quest"), Path("ref4000/BinOutput/Quest")]
+
+          def load(path):
+              with path.open("r", encoding="utf-8") as fp:
+                  return json.load(fp)
+
+          def rows(document):
+              return {
+                  int(row.get("subId") or 0): row
+                  for row in document.get("subQuests", [])
+                  if isinstance(row, dict) and int(row.get("subId") or 0) > 0
+              }
+
+          counts = Counter()
+          details = []
+          per_main = {}
+
+          for main_id in mains:
+              current_rows = rows(load(current_root / f"{main_id}.json"))
+              ref_maps = [rows(load(root / f"{main_id}.json")) for root in reference_roots]
+              all_ids = sorted(set().union(*(set(m) for m in ref_maps)))
+              local = Counter()
+
+              for sub_id in all_ids:
+                  refs = [m.get(sub_id) for m in ref_maps]
+                  present_refs = [row for row in refs if row is not None]
+                  if len(present_refs) != len(refs):
+                      kind = "partial-reference-coverage"
+                  elif len({reference_signature(row) for row in present_refs}) != 1:
+                      kind = "reference-disagreement"
+                  else:
+                      current = current_rows.get(sub_id)
+                      if current is None:
+                          kind = "current-source-missing-row"
+                      else:
+                          expected_accept = normalize_accept(present_refs[0].get("acceptCond"))
+                          expected_comb = normalize_comb(present_refs[0])
+                          current_accept = normalize_accept(current.get("acceptCond"))
+                          current_comb = normalize_comb(current)
+                          if current_accept == expected_accept and current_comb == expected_comb:
+                              kind = "match"
+                          elif not current_accept and expected_accept:
+                              kind = "missing-accept"
+                          elif current_comb != expected_comb:
+                              kind = "combiner-drift"
+                          else:
+                              kind = "condition-drift"
+
+                  counts[kind] += 1
+                  local[kind] += 1
+                  if kind != "match":
+                      current = current_rows.get(sub_id)
+                      ref = present_refs[0] if present_refs else None
+                      details.append({
+                          "classification": kind,
+                          "main_id": main_id,
+                          "sub_id": sub_id,
+                          "current_accept": normalize_accept(current.get("acceptCond")) if current else None,
+                          "current_comb": normalize_comb(current) if current else None,
+                          "reference_accept": normalize_accept(ref.get("acceptCond")) if ref else None,
+                          "reference_comb": normalize_comb(ref) if ref else None,
+                      })
+
+              per_main[str(main_id)] = dict(sorted(local.items()))
+
+          result = {
+              "counts": dict(sorted(counts.items())),
+              "per_main": per_main,
+              "details": details,
+          }
+          Path("chapter1301-source-audit.json").write_text(
+              json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+          )
+          print("Chapter 1301 current-source audit")
+          for key, value in sorted(counts.items()):
+              print(f"  {key}: {value}")
+          print("Per main:")
+          for main_id, local in per_main.items():
+              print(f"  {main_id}: {local}")
+          print("Differences:")
+          for item in details:
+              print(json.dumps(item, ensure_ascii=False, sort_keys=True))
+          PY
+
+      - name: Upload discovery reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: chapter1301-prerequisite-discovery
+          path: |
+            chapter1301-questexcel-audit.json
+            chapter1301-questexcel-audit.txt
+            chapter1301-source-audit.json
