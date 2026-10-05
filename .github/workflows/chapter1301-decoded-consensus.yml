@@ -1,0 +1,223 @@
+name: Verify Chapter 1301 decoded prerequisite consensus
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/chapter1301-decoded-consensus.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current resources
+        uses: actions/checkout@v4
+        with:
+          path: current
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - name: Checkout decoded 3.7-era TSV snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: wander-in-wind/TsvParser
+          ref: 249e7cb402c31f0f21ac649d5879a6f91007dc12
+          path: tsv37
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            src/main/resources/json/3000.json
+            src/main/resources/json/3001.json
+            src/main/resources/json/3002.json
+            src/main/resources/json/3003.json
+            src/main/resources/json/3004.json
+            src/main/resources/json/3005.json
+            src/main/resources/json/3006.json
+
+      - name: Checkout decoded later snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: capyb2222/LunaGC-Resources
+          ref: 395a5ee6442142a803691f60d541ee1706ae9cd7
+          path: luna
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/3000.json
+            BinOutput/Quest/3001.json
+            BinOutput/Quest/3002.json
+            BinOutput/Quest/3003.json
+            BinOutput/Quest/3004.json
+            BinOutput/Quest/3005.json
+            BinOutput/Quest/3006.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compare decoded prerequisite graphs
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          MAINS = range(3000, 3007)
+          DEFAULT_COMBS = {None, "", "LOGIC_NONE"}
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding="utf-8"))
+
+          def rows(doc):
+              return {
+                  int(row["subId"]): row
+                  for row in doc.get("subQuests", [])
+                  if isinstance(row, dict) and row.get("subId") is not None
+              }
+
+          def normalize_scalar(value):
+              if isinstance(value, str):
+                  try:
+                      return int(value)
+                  except ValueError:
+                      return value
+              return value
+
+          def normalize_accept(row):
+              out = []
+              value = row.get("acceptCond")
+              if not isinstance(value, list):
+                  return out
+              for cond in value:
+                  if not isinstance(cond, dict) or not cond.get("type"):
+                      continue
+                  params = cond.get("param", [])
+                  if not isinstance(params, list):
+                      params = []
+                  out.append({
+                      "type": cond["type"],
+                      "param": [normalize_scalar(v) for v in params],
+                  })
+              return out
+
+          def normalize_comb(row):
+              value = row.get("acceptCondComb")
+              return "LOGIC_AND" if value in DEFAULT_COMBS else value
+
+          def signature(row):
+              return (normalize_accept(row), normalize_comb(row))
+
+          current_excel_doc = load("current/ExcelBinOutput/QuestExcelConfigData.json")
+          current_excel = {
+              int(row["subId"]): row
+              for row in current_excel_doc
+              if isinstance(row, dict) and int(row.get("mainId") or 0) in MAINS
+          }
+
+          totals = Counter()
+          per_main = defaultdict(Counter)
+          disagreements = []
+          current_only = []
+          expected_type_counts = Counter()
+          expected_comb_counts = Counter()
+
+          for main_id in MAINS:
+              cur = rows(load(f"current/BinOutput/Quest/{main_id}.json"))
+              old = rows(load(f"tsv37/src/main/resources/json/{main_id}.json"))
+              later = rows(load(f"luna/BinOutput/Quest/{main_id}.json"))
+
+              old_ids = set(old)
+              later_ids = set(later)
+              common = sorted(old_ids & later_ids)
+              only_old = sorted(old_ids - later_ids)
+              only_later = sorted(later_ids - old_ids)
+              only_current = sorted(set(cur) - (old_ids | later_ids))
+              current_only.extend((main_id, sub_id) for sub_id in only_current)
+
+              print(f"MQ {main_id}: 3.7-era={len(old)} later={len(later)} current={len(cur)}")
+              print(f"  only-3.7-era={only_old}")
+              print(f"  only-later={only_later}")
+              print(f"  current-only={only_current}")
+
+              if only_old or only_later:
+                  totals["membership-disagreement"] += len(only_old) + len(only_later)
+                  per_main[main_id]["membership-disagreement"] += len(only_old) + len(only_later)
+
+              for sub_id in common:
+                  a = signature(old[sub_id])
+                  b = signature(later[sub_id])
+                  if a != b:
+                      totals["semantic-disagreement"] += 1
+                      per_main[main_id]["semantic-disagreement"] += 1
+                      disagreements.append({
+                          "main_id": main_id,
+                          "sub_id": sub_id,
+                          "tsv37": a,
+                          "later": b,
+                      })
+                      continue
+
+                  totals["semantic-consensus"] += 1
+                  per_main[main_id]["semantic-consensus"] += 1
+                  expected_accept, expected_comb = a
+                  for cond in expected_accept:
+                      expected_type_counts[cond["type"]] += 1
+                  expected_comb_counts[expected_comb] += 1
+
+                  source_accept = normalize_accept(cur.get(sub_id, {}))
+                  if not source_accept:
+                      totals["current-source-missing-accept"] += 1
+                      per_main[main_id]["current-source-missing-accept"] += 1
+                  elif signature(cur[sub_id]) == a:
+                      totals["current-source-match"] += 1
+                      per_main[main_id]["current-source-match"] += 1
+                  else:
+                      totals["current-source-other"] += 1
+                      per_main[main_id]["current-source-other"] += 1
+
+                  flat = current_excel.get(sub_id)
+                  if flat is None:
+                      totals["current-flat-missing-row"] += 1
+                      per_main[main_id]["current-flat-missing-row"] += 1
+                  elif signature(flat) == a:
+                      totals["current-flat-match"] += 1
+                      per_main[main_id]["current-flat-match"] += 1
+                  else:
+                      totals["current-flat-drift"] += 1
+                      per_main[main_id]["current-flat-drift"] += 1
+
+          print("\nSUMMARY")
+          for key, value in sorted(totals.items()):
+              print(f"  {key}: {value}")
+          print(f"  current-only: {current_only}")
+          print(f"  expected condition types: {dict(sorted(expected_type_counts.items()))}")
+          print(f"  expected combiners: {dict(sorted(expected_comb_counts.items()))}")
+          print("\nPER MAIN")
+          for main_id in MAINS:
+              print(f"  {main_id}: {dict(sorted(per_main[main_id].items()))}")
+
+          if disagreements:
+              print("\nDISAGREEMENTS")
+              for row in disagreements:
+                  print(json.dumps(row, ensure_ascii=False, sort_keys=True))
+
+          assert totals["membership-disagreement"] == 0, totals
+          assert totals["semantic-disagreement"] == 0, totals
+          assert totals["semantic-consensus"] == 110, totals
+          assert totals["current-source-missing-accept"] == 110, totals
+          assert totals["current-source-other"] == 0, totals
+          assert totals["current-flat-missing-row"] == 0, totals
+          assert not any(cond_type == "QUEST_COND_UNKNOWN" for cond_type in expected_type_counts), expected_type_counts
+          assert current_only == [(3000, 300012)], current_only
+          PY
