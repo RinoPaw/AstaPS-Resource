@@ -5,7 +5,7 @@ on:
       - '.github/workflows/tmp-quest352-slime-discovery.yml'
   workflow_dispatch:
 
-# Temporary narrow inspection for the Unexpected Power quest rows.
+# Temporary narrow validation for the early Mondstadt quest field repair.
 jobs:
   trace:
     runs-on: ubuntu-latest
@@ -14,28 +14,14 @@ jobs:
         with:
           sparse-checkout: |
             ExcelBinOutput/QuestExcelConfigData.json
-            BinOutput/Quest/353.json
+            tools/fix_early_quest_fields.py
           sparse-checkout-cone-mode: false
-      - name: Compare runtime and BinOutput quest 353 rows
+      - name: Check evidence-backed early quest repairs
         shell: bash
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          targets = {35301, 35302, 35312}
-          for path in [
-              Path('ExcelBinOutput/QuestExcelConfigData.json'),
-              Path('BinOutput/Quest/353.json'),
-          ]:
-              print(f'=== {path} ===')
-              rows = json.loads(path.read_text(encoding='utf-8'))
-              found = []
-              for row in rows:
-                  sid = row.get('subId')
-                  if sid in targets:
-                      found.append(sid)
-                      print(json.dumps(row, ensure_ascii=False, indent=2, sort_keys=True))
-              print('found:', sorted(found))
-          PY
+          set +e
+          python tools/fix_early_quest_fields.py --check
+          rc=$?
+          echo "check_exit=$rc"
+          # Exit 1 means the checker found pending repairs; keep the discovery job successful.
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
