@@ -1,11 +1,11 @@
-name: tmp quest352 slime discovery
+name: tmp quest353 runtime-data discovery
 on:
   push:
     paths:
       - '.github/workflows/tmp-quest352-slime-discovery.yml'
   workflow_dispatch:
 
-# Temporary narrow grep for the Unexpected Power slime encounter.
+# Temporary narrow inspection for the Unexpected Power quest rows.
 jobs:
   trace:
     runs-on: ubuntu-latest
@@ -13,19 +13,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            Scripts/Scene/3
-          sparse-checkout-cone-mode: true
-      - name: Find quest 352 script references
+            ExcelBinOutput/QuestExcelConfigData.json
+            BinOutput/Quest/353.json
+          sparse-checkout-cone-mode: false
+      - name: Compare runtime and BinOutput quest 353 rows
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== quest ids / plot ids ==='
-          grep -R -n -E '3520[0-5]|35216|1172' Scripts/Scene/3 || true
-          echo '=== trigger fire 1003 context ==='
-          grep -R -n -E '1003|QUEST_CONTENT_TRIGGER_FIRE' Scripts/Scene/3 | head -400 || true
-          echo '=== Starfell slime create calls near quest refs ==='
-          files=$(grep -R -l -E '3520[0-5]|35216|1172' Scripts/Scene/3 || true)
-          for f in $files; do
-            echo "--- $f ---"
-            grep -n -C 12 -E '3520[0-5]|35216|1172|CreateMonster|monster|MONSTER|QUEST' "$f" || true
-          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          targets = {35301, 35302, 35312}
+          for path in [
+              Path('ExcelBinOutput/QuestExcelConfigData.json'),
+              Path('BinOutput/Quest/353.json'),
+          ]:
+              print(f'=== {path} ===')
+              rows = json.loads(path.read_text(encoding='utf-8'))
+              found = []
+              for row in rows:
+                  sid = row.get('subId')
+                  if sid in targets:
+                      found.append(sid)
+                      print(json.dumps(row, ensure_ascii=False, indent=2, sort_keys=True))
+              print('found:', sorted(found))
+          PY
