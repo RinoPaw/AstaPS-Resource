@@ -79,6 +79,21 @@ EXPECTED_BEGIN_EXECS = {
     ],
     # Forest Rendezvous hidden plot controller. This suite is active only while 36100 is running.
     36100: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003436,1"])],
+    30904: [exec_entry("QUEST_EXEC_ADD_QUEST_PROGRESS", ["359011", "1"])],
+    35404: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003439"])],
+    35901: [exec_entry("QUEST_EXEC_SET_WEATHER_GADGET", ["3", "1"])],
+    36001: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003435,1"])],
+    36003: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003136,1"])],
+    37303: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001305,2"])],
+    38202: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001249,2"])],
+    38905: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133007227"])],
+    39003: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133007227"])],
+    39401: [exec_entry("QUEST_EXEC_UNLOCK_POINT", ["3", "38"])],
+    39604: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001910,2"])],
+    39703: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133002233,2"])],
+    39801: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003910,2"])],
+    39808: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133004917,1"])],
+    39812: [exec_entry("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003910"])],
 }
 
 EXPECTED_ACCEPT = {
@@ -157,6 +172,21 @@ EXPECTED_MAIN = {
     35901: 359,
     36100: 361,
     36101: 361,
+    30904: 309,
+    35404: 354,
+    35901: 359,
+    36001: 360,
+    36003: 360,
+    37303: 373,
+    38202: 382,
+    38905: 389,
+    39003: 390,
+    39401: 394,
+    39604: 396,
+    39703: 397,
+    39801: 398,
+    39808: 398,
+    39812: 398,
 }
 
 
