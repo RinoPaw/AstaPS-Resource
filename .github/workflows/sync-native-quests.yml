@@ -1,0 +1,74 @@
+name: Sync native 7.1 quests
+
+on:
+  push:
+    branches: [play/rino]
+    paths:
+      - ".github/workflows/sync-native-quests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: play/rino
+          fetch-depth: 1
+
+      - name: Fetch pinned native quests.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/RinoPaw/Genshin-Reverse/6030649779ed0155dc289dd83c61fae1a2ca437a/versions/7.1.0-global/quests.json" \
+            --output quests.json
+
+      - name: Validate native Quest bundle
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path("quests.json")
+          raw = path.read_bytes()
+          data = json.loads(raw)
+
+          assert data["schemaVersion"] == 1
+          assert data["gameVersion"] == "7.1.0-global"
+          assert data["source"]["repository"] == "RinoPaw/Genshin-Reverse"
+
+          coverage = data["coverage"]
+          assert coverage["total"] == 4417
+          assert coverage["fullConsumed"] == 3993
+          assert coverage["failed"] == 424
+          assert len(data["mainQuests"]) == 3993
+          assert len(data["failedMainQuests"]) == 424
+
+          ids = [int(row["mainId"]) for row in data["mainQuests"]]
+          assert len(ids) == len(set(ids))
+          for main_id in (351, 1000, 2000, 3000, 3022):
+              assert main_id in ids, main_id
+
+          print("quests.json sha256:", hashlib.sha256(raw).hexdigest())
+          print("native full-consumed:", coverage["fullConsumed"], "/", coverage["total"])
+          PY
+
+      - name: Commit native Quest bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- quests.json && git ls-files --error-unmatch quests.json >/dev/null 2>&1; then
+            echo "quests.json is already current."
+            exit 0
+          fi
+          git config user.name "Rino"
+          git config user.email "71957726+RinoPaw@users.noreply.github.com"
+          git add quests.json
+          git commit -m "data: add native 7.1 quests bundle [skip ci]"
+          git push origin HEAD:play/rino
