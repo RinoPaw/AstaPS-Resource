@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections import Counter
 from pathlib import Path
 
 
@@ -65,9 +66,9 @@ def state_equal(quest_id: int) -> dict:
     }
 
 
-# Evidence source: intact pre-obfuscation GCResource quest data for the same early Mondstadt chain.
-# Only fields that disappeared from the 7.1 conversion are recovered here. Existing meaningful
-# values are never overwritten silently; an unexpected value aborts the patch.
+# Evidence source: intact pre-obfuscation Quest data for the same Mondstadt chain.
+# Recovery is monotonic: all upstream acceptCond and beginExec entries are retained, and only
+# evidence-backed missing entries are appended.
 EXPECTED_BEGIN_EXECS = {
     35104: [exec_entry("QUEST_EXEC_SET_IS_GAME_TIME_LOCKED", ["1"])],
     35301: [exec_entry("QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,1"])],
@@ -169,7 +170,6 @@ EXPECTED_MAIN = {
     35503: 355,
     35504: 355,
     35505: 355,
-    35901: 359,
     36100: 361,
     36101: 361,
     30904: 309,
@@ -214,6 +214,69 @@ def normalized_accept(value):
     return out
 
 
+def accept_key(entry: dict):
+    if not isinstance(entry, dict) or not entry.get("type"):
+        return None
+    params = entry.get("param", [])
+    if not isinstance(params, list):
+        params = []
+    if entry.get("type") in ("QUEST_COND_STATE_EQUAL", "QUEST_COND_STATE_NOT_EQUAL") and len(params) >= 2:
+        params = params[:2]
+    return (
+        entry.get("type"),
+        tuple(params),
+        entry.get("param_str", entry.get("paramStr", "")) or "",
+    )
+
+
+def exec_key(entry: dict):
+    if not isinstance(entry, dict) or not entry.get("type"):
+        return None
+    params = entry.get("param", [])
+    if not isinstance(params, list):
+        params = []
+    return entry.get("type"), tuple(params)
+
+
+def merge_entries_preserving_existing(current, expected, key_fn) -> list[dict]:
+    """Keep every upstream entry and append only missing expected occurrences."""
+    merged = list(current) if isinstance(current, list) else []
+    counts = Counter(key for entry in merged if (key := key_fn(entry)) is not None)
+    required = Counter()
+    for entry in expected:
+        key = key_fn(entry)
+        if key is None:
+            continue
+        required[key] += 1
+        if counts[key] < required[key]:
+            merged.append(dict(entry))
+            counts[key] += 1
+    return merged
+
+
+def raw_entry_key(entry) -> str:
+    return json.dumps(entry, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def assert_monotonic_field(before: dict, after: dict, field: str) -> None:
+    before_entries = before.get(field)
+    after_entries = after.get(field)
+    before_entries = before_entries if isinstance(before_entries, list) else []
+    after_entries = after_entries if isinstance(after_entries, list) else []
+    before_counts = Counter(raw_entry_key(entry) for entry in before_entries)
+    after_counts = Counter(raw_entry_key(entry) for entry in after_entries)
+    removed = before_counts - after_counts
+    if removed:
+        raise ValueError(
+            f"Quest {after.get('subId')} removed upstream {field} entries: {dict(removed)!r}"
+        )
+
+
+def assert_monotonic_quest_fields(before: dict, after: dict) -> None:
+    assert_monotonic_field(before, after, "acceptCond")
+    assert_monotonic_field(before, after, "beginExec")
+
+
 def patch_record(obj: dict) -> list[str]:
     sub_id = obj.get("subId")
     if sub_id not in TARGETS:
@@ -229,49 +292,23 @@ def patch_record(obj: dict) -> list[str]:
 
     expected_accept = EXPECTED_ACCEPT.get(sub_id)
     if expected_accept is not None:
-        current = normalized_accept(obj.get("acceptCond"))
-        expected = normalized_accept(expected_accept)
-        damaged = [normalized_accept([state_equal(0)])]
-        damaged.extend(
-            normalized_accept(variant)
-            for variant in KNOWN_DAMAGED_ACCEPT.get(sub_id, [])
+        merged_accept = merge_entries_preserving_existing(
+            obj.get("acceptCond"), expected_accept, accept_key
         )
-        if current == expected:
-            pass
-        elif not current or current in damaged:
-            # The 7.1 converter is known to zero, drop, or sequentialize predecessor fields in this
-            # early Archon chain. Only evidence-backed target rows are repaired here; any other
-            # meaningful predecessor still aborts below.
-            obj["acceptCond"] = expected_accept
-            predecessors = ",".join(str(entry["param"][0]) for entry in expected_accept)
-            changes.append(f"acceptCond={predecessors}:FINISHED")
-        else:
-            raise ValueError(
-                f"Quest {sub_id} has unexpected meaningful acceptCond: {current!r}; "
-                f"expected {expected!r}"
-            )
+        if obj.get("acceptCond") != merged_accept:
+            added = len(merged_accept) - len(obj.get("acceptCond") or [])
+            obj["acceptCond"] = merged_accept
+            changes.append(f"acceptCond+{added}")
 
     expected_execs = EXPECTED_BEGIN_EXECS.get(sub_id)
     if expected_execs is not None:
-        current_execs = normalized_execs(obj.get("beginExec"))
-        expected_normalized = [
-            {"type": entry["type"], "param": entry.get("param", [])}
-            for entry in expected_execs
-        ]
-        if current_execs == expected_normalized:
-            pass
-        elif not current_execs:
-            # Drop converter placeholder entries that have no type. AstaPS filters them at load
-            # time, and retaining them only hides the missing semantic execs.
-            obj["beginExec"] = expected_execs
-            changes.append(
-                "beginExec=" + ",".join(entry["type"] for entry in expected_execs)
-            )
-        else:
-            raise ValueError(
-                f"Quest {sub_id} has unexpected meaningful beginExec: {current_execs!r}; "
-                f"expected {expected_normalized!r}"
-            )
+        merged_execs = merge_entries_preserving_existing(
+            obj.get("beginExec"), expected_execs, exec_key
+        )
+        if obj.get("beginExec") != merged_execs:
+            added = len(merged_execs) - len(obj.get("beginExec") or [])
+            obj["beginExec"] = merged_execs
+            changes.append(f"beginExec+{added}")
 
     for field, expected in EXPECTED_LOGIC.get(sub_id, {}).items():
         current = obj.get(field)
@@ -345,7 +382,9 @@ def main() -> int:
             raise SystemExit(f"Quest {sub_id} appears more than once in {path}")
         found.add(sub_id)
 
+        before = json.loads(raw)
         changes = patch_record(obj)
+        assert_monotonic_quest_fields(before, obj)
         if changes:
             pending[sub_id] = changes
             replacements.append((start, end, render_object(obj)))
