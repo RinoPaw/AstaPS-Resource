@@ -1,0 +1,66 @@
+name: Verify Quest field superset
+
+on:
+  push:
+    branches: [rino-native-mainline-quests]
+    paths:
+      - "tools/fix_early_quest_fields.py"
+      - "tools/upgrade_questexcel_from_repaired_quest.py"
+      - "tools/verify_quest_field_superset.py"
+      - ".github/workflows/verify-quest-field-superset.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rino-native-mainline-quests
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve current upstream baseline
+        id: upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git ls-remote https://github.com/MeChen618/AstaPS-Resource.git refs/heads/main | cut -f1)"
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Upstream: $sha"
+          curl -fL --retry 3 \
+            "https://raw.githubusercontent.com/MeChen618/AstaPS-Resource/$sha/ExcelBinOutput/QuestExcelConfigData.json" \
+            -o /tmp/upstream-QuestExcelConfigData.json
+
+      - name: Apply Rino overlays
+        run: python tools/upgrade_questexcel_from_repaired_quest.py
+
+      - name: Verify overlay is idempotent
+        run: python tools/upgrade_questexcel_from_repaired_quest.py --check
+
+      - name: Verify acceptCond and beginExec only grow from upstream
+        run: |
+          python tools/verify_quest_field_superset.py \
+            /tmp/upstream-QuestExcelConfigData.json \
+            ExcelBinOutput/QuestExcelConfigData.json
+
+      - name: Commit generated QuestExcel
+        shell: bash
+        run: |
+          if git diff --quiet -- ExcelBinOutput/QuestExcelConfigData.json; then
+            echo "QuestExcel is already current."
+            exit 0
+          fi
+          git config user.name "Rino"
+          git config user.email "71957726+RinoPaw@users.noreply.github.com"
+          git add ExcelBinOutput/QuestExcelConfigData.json
+          git commit -m "data: apply monotonic Mondstadt quest field overlay [skip ci]"
+          git push origin HEAD:rino-native-mainline-quests
