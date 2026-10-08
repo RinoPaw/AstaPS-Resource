@@ -179,3 +179,15 @@ Both historical GCResource 3700 and 4000 specify LOGIC_OR for quest
 7.1 file lacked failCondComb and would ignore the world-return branch.
 Restore the historical OR, preserving the independent failure paths;
 static CI now checks the exact condition order and IDs.
+
+## 35901 weather-gadget evidence boundary
+
+The 7.1 quest has SET_WEATHER_GADGET(3,1) on begin, then
+SET_WEATHER_GADGET(3,0) and (1,0) on finish. Separately, current 7.1
+`Scripts/Quest/Share/Q359ShareConfig.lua` declares the quest-owned
+`MengdeWindDragon` gadget (ID 70700004) in scene 3. These are correlated
+quest/weather-effect assets, but the relationship between the opcode's
+arguments and the client entity/weather system is not yet established.
+Do not invent a Player.setWeather mapping: WeatherExcel's regional weather
+IDs are a separate data model. Static CI checks all three actions and the
+VFX actor, and the unsupported opcode remains explicitly reported.

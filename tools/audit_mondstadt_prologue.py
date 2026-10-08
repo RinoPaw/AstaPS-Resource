@@ -368,6 +368,29 @@ def main():
     for sub, (field, kind, params) in ACTIONS.items():
         require(sub in subs and expected_action(subs[sub], field, kind, params),
                 "Lost reviewed compatibility %d %s %s" % (sub, field, kind))
+    # The native/historical weather action has no verified server-side
+    # handler. Verify its quest context and cleanup actions without treating
+    # the second parameter as an invented climate ID.
+    for field, params in [
+        ("beginExec", ["3", "1"]),
+        ("finishExec", ["3", "0"]),
+        ("finishExec", ["1", "0"]),
+    ]:
+        require(expected_action(subs[35901], field,
+                                "QUEST_EXEC_SET_WEATHER_GADGET", params),
+                "35901 weather-gadget activation/reset action missing: %s %s" %
+                (field, params))
+    quest359 = Path("Scripts/Quest/Share/Q359ShareConfig.lua").read_text(encoding="utf-8")
+    quest359_actor = re.search(
+        r'quest_data\["35901"\]\s*=\s*\{(.*?)quest_data\["35902"\]',
+        quest359, re.S)
+    require(quest359_actor is not None,
+            "35901 quest actor configuration absent")
+    require(re.search(r"\bid\s*=\s*70700004\b", quest359_actor.group(1))
+            and 'alias = "MengdeWindDragon"' in quest359_actor.group(1)
+            and re.search(r"\bscene_id\s*=\s*3\b", quest359_actor.group(1)),
+            "35901 Stormterror weather VFX quest gadget lost from Q359 config")
+    print("PASS 35901 weather-gadget evidence: activation, two cleanup actions, quest VFX actor; opcode still unsupported")
     for sub, predecessors in REQUIRED_ACCEPT_EDGES.items():
         require(sub in subs, "Missing reviewed acceptance node %d" % sub)
         for prev in predecessors:
