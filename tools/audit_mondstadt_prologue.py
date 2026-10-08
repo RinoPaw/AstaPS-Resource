@@ -383,6 +383,20 @@ def main():
                                 "QUEST_EXEC_SET_WEATHER_GADGET", params),
                 "35901 weather-gadget activation/reset action missing: %s %s" %
                 (field, params))
+    # 39403's finish in dungeon 1008 must deactivate weather in scene 3
+    # and notify its cross-group seal cleanup Lua.
+    require([(a.get("type"), a.get("param")) for a in subs[39403]["finishExec"]] == [
+        ("QUEST_EXEC_REMOVE_TRIAL_AVATAR", ["5"]),
+        ("QUEST_EXEC_SET_WEATHER_GADGET", ["2", "0"]),
+        ("QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133007183"]),
+    ], "39403 verified finishExec order changed")
+    seal_lua = Path("Scripts/Scene/3/scene3_group133007183.lua").read_text(encoding="utf-8")
+    require("39403 ~= evt.param1" in seal_lua
+            and "1 ~= evt.param2" in seal_lua,
+            "39403 Lua notification group lacks expected finish trigger")
+    for gid in (133007004, 133007076, 133007078, 133007079, 133007001):
+        require(re.search(r"group_id\s*=\s*%d\b" % gid, seal_lua),
+                "39403 cleanup lost target group %d" % gid)
     quest359 = Path("Scripts/Quest/Share/Q359ShareConfig.lua").read_text(encoding="utf-8")
     quest359_actor = re.search(
         r'quest_data\["35901"\]\s*=\s*\{(.*?)quest_data\["35902"\]',

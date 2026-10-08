@@ -212,3 +212,14 @@ as the WeatherExcel gadget. The 7.1 resource CI now pins these joins. The paired
 `fix/mondstadt-runtime-rino-71` has an implemented opcode handler and
 passes CI. Whether the 7.1 client displays the intended storm and cleanup
 needs end-to-end validation.
+
+## Third-act 39403 scene-3 cleanup contract
+
+The verified `39403` finish actions execute in order:
+`REMOVE_TRIAL_AVATAR(5)`, `SET_WEATHER_GADGET(2,0)`, and
+`NOTIFY_GROUP_LUA(3,133007183)`. Its native scene-3 Lua group accepts
+`EVENT_QUEST_FINISH` for subquest 39403 with success=1 and targets the
+five seal gadget groups 133007004, 133007076, 133007078, 133007079,
+and 133007001. Static CI now pins these dependencies. The paired server's
+Lua group handler must wait for scene 3 after the dungeon exit and respect
+the explicit `group_id` given to the kill script function.
