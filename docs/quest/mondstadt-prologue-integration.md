@@ -171,3 +171,11 @@ just as the existing 35203 alternative-death/plot fail condition does.
 These four battle quests can fail on either story-cancel or a full-party
 wipe. The static gate now pins both failure conditions and the OR
 combinator, with a matching scoped server-side failCondComb fallback.
+
+## Leaving Stormterror dungeon during 39404
+
+Both historical GCResource 3700 and 4000 specify LOGIC_OR for quest
+39404 failCond: fail dungeon 2001 OR enter scene 3. The materialized
+7.1 file lacked failCondComb and would ignore the world-return branch.
+Restore the historical OR, preserving the independent failure paths;
+static CI now checks the exact condition order and IDs.
