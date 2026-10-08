@@ -9,6 +9,8 @@ on:
       - 'ExcelBinOutput/QuestExcelConfigData.json'
       - 'Scripts/Scene/3/**'
       - 'tools/audit_mondstadt_prologue.py'
+      - 'tools/report_mondstadt_quest_drift.py'
+      - 'tools/test_mondstadt_drift.py'
       - '.github/workflows/mondstadt-prologue-audit.yml'
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - 'ExcelBinOutput/QuestExcelConfigData.json'
       - 'Scripts/Scene/3/**'
       - 'tools/audit_mondstadt_prologue.py'
+      - 'tools/report_mondstadt_quest_drift.py'
+      - 'tools/test_mondstadt_drift.py'
       - '.github/workflows/mondstadt-prologue-audit.yml'
   workflow_dispatch:
 
@@ -30,6 +34,8 @@ jobs:
           python-version: '3.11'
       - name: Static validate all Mondstadt prologue main quests
         run: python tools/audit_mondstadt_prologue.py
+      - name: Test drift classification semantics
+        run: python -m unittest discover -s tools -p 'test_mondstadt_drift.py'
       - name: Report scoped QuestExcel compatibility drift
         run: python tools/report_mondstadt_quest_drift.py
       - name: Upload scoped drift evidence

@@ -72,3 +72,11 @@ per-condition provenance and avoids silently replacing the entire table.
 Remaining acceptance graph and cross-scene visual gameplay must be checked
 after code and CI validation. Do not claim three-act completion based only
 on static resources.
+
+## Drift reporting semantics
+
+Historical STATE_EQUAL/STATE_NOT_EQUAL arrays often carry a third zero padding
+value; the scoped report normalizes that layout. Missing BinOutput compatibility
+is counted separately, not treated as a proven Excel defect. Predecessor,
+combinator and Quest-0 placeholder conflicts remain visible but are evidence
+candidates, never automatically overwritten or promoted to 7.1 native data.
