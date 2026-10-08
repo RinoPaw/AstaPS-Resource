@@ -90,6 +90,26 @@ def check_scene(scripts):
     scripts.add("353 slime, 354 target, 360 hilichurl groups")
 
 
+def check_act23_resources():
+    routes = load("BinOutput/LevelDesign/Routes/scene20023_routes.json")
+    require(routes.get("sceneId") == 20023, "Act II elevator route scene mismatch")
+    require(any(x.get("localId") == 3 for x in routes.get("routes", [])),
+            "Act II hideout elevator route 3 absent")
+    keep = Path("Scripts/Scene/20017/scene20017_block20017.lua").read_text(encoding="utf-8")
+    require("220017001" in keep and "dontUnload = true" in keep,
+            "Act III Stormterror scene group lifetime not retained")
+    for scene in (20017, 20018, 20020):
+        s = Path("Scripts/Scene/%d/scene%d_group2200%d001.lua" % (scene, scene, scene % 100)).read_text(encoding="utf-8")
+        require("special_name_id = 2010102" in s,
+                "Stormterror scene %d missing corrected displayed name" % scene)
+    for gid in (133007228, 133007229, 133007230):
+        text = lua(gid)
+        require("Point_Value" in text and "Temp_Point_Value" in text,
+                "Tower seal %d lacks collection/delivery state" % gid)
+    final = lua(133007230)
+    require("seal_battle_done" in final, "Third seal missing battle-complete guard")
+
+
 def main():
     mains, subs, count = {}, {}, 0
     for chapter, ids in SCOPE.items():
@@ -148,6 +168,7 @@ def main():
                 "QuestExcel prematurely grants trial Amber")
     scripts = set()
     check_scene(scripts)
+    check_act23_resources()
     print("PASS static Mondstadt prologue: %d main quests, %d subquests, "
           "%d reviewed actions; %s" %
           (len(mains), count, len(ACTIONS), ", ".join(sorted(scripts))))

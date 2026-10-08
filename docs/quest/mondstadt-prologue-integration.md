@@ -57,3 +57,18 @@ scene Lua linkage and spreadsheet override conflicts where present. Unknown
 Do not request a client test before the full CI gates are green. Existing
 generic prerequisite audit failures outside this scope must be reported
 separately; they are not evidence this new scoped check passed.
+
+## Imported evidence-supported companion work
+
+Select native-resource-side changes from upstream resource PR #13 are folded
+in without copying QuestExcel wholesale: Act II 20101 route 3; Act III
+Stormterror group keepalive and name IDs; Light Guiding Ceremony seal
+ability/Lua state handling. Companion server runtime is drawn from PR #87
+and PR #71 with chapter bootstrap-at-birth explicitly excluded.
+
+**Not yet imported:** PR #13's broad flattened QuestExcel changes (several
+hundred entries), because the native 7.1 Quest ownership boundary requires
+per-condition provenance and avoids silently replacing the entire table.
+Remaining acceptance graph and cross-scene visual gameplay must be checked
+after code and CI validation. Do not claim three-act completion based only
+on static resources.
