@@ -117,3 +117,13 @@ both 360 combat group starts. The 35502 plot/scene join requires LOGIC_AND.
 The Act II and III entry edges 31101 -> 37001 and 38406 -> 39701 are
 also checked. Unknown chapter-controller acceptance is not reconstructed
 from numeric ordering or guessed from a missing acceptCond record.
+
+## Whole first-act group-action linkage
+
+All refreshed groups and Lua notifications in the prelude and Act I (not
+just the originally known slime and hilichurl repairs) are audited against
+actual scene Lua files. Refresh suite indices must be in the Lua suites table,
+including the scene 1004 dungeon group. Quest-start or quest-finish
+notifications must target a script with the corresponding event type. This
+remains structural validation; it does not execute ScriptLib or check loaded
+world entities.

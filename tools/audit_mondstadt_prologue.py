@@ -132,6 +132,90 @@ def check_scene(scripts):
     scripts.add("353 first/second/third slime waves, 354 target, 360 hilichurl groups")
 
 
+def count_lua_suites(source):
+    """Count top-level suites without mistaking nested monsters/triggers for suites."""
+    match = re.search(r"\bsuites\s*=\s*\{", source)
+    require(match is not None, "Lua group has no suites table")
+    level = 0
+    count = 0
+    quoted = None
+    index = match.end() - 1
+    while index < len(source):
+        c = source[index]
+        if quoted is not None:
+            if c == "\\":
+                index += 2
+                continue
+            if c == quoted:
+                quoted = None
+        elif source[index:index + 2] == "--":
+            end = source.find("\n", index)
+            index = len(source) if end == -1 else end
+            continue
+        elif c in ("'", '"'):
+            quoted = c
+        elif c == "{":
+            if level == 1:
+                count += 1
+            level += 1
+        elif c == "}":
+            level -= 1
+            if level == 0:
+                return count
+        index += 1
+    raise AssertionError("Unclosed Lua suites table")
+
+
+def check_act1_group_references(mains):
+    """Check every quest-driven group and requested suite, not only handpicked fixes."""
+    verified = 0
+    cached = {}
+    for main in SCOPE["prelude"] + SCOPE["act1"]:
+        for row in mains[main]["subQuests"]:
+            for field in ("beginExec", "finishExec", "failExec"):
+                for action in row.get(field, []):
+                    kind = action.get("type")
+                    if kind not in ("QUEST_EXEC_REFRESH_GROUP_SUITE",
+                                    "QUEST_EXEC_NOTIFY_GROUP_LUA"):
+                        continue
+                    params = action.get("param") or []
+                    require(len(params) >= 2, "Quest %d %s lacks scene/group args" %
+                            (row["subId"], kind))
+                    scene = int(params[0])
+                    entries = (params[1].split(";") if kind == "QUEST_EXEC_REFRESH_GROUP_SUITE"
+                               else [params[1]])
+                    for entry in entries:
+                        pieces = entry.split(",")
+                        require(pieces[0].strip().isdigit(),
+                                "Quest %d malformed group %s" % (row["subId"], entry))
+                        group = int(pieces[0])
+                        path = Path("Scripts/Scene/%d/scene%d_group%d.lua" %
+                                    (scene, scene, group))
+                        require(path.is_file(), "Quest %d references absent group %s" %
+                                (row["subId"], path))
+                        if path not in cached:
+                            lua_text = path.read_text(encoding="utf-8")
+                            require(re.search(r"\bgroup_id\s*=\s*%d\b" % group, lua_text),
+                                    "Wrong identity in Lua group %d" % group)
+                            cached[path] = (lua_text, count_lua_suites(lua_text))
+                        lua_text, suite_count = cached[path]
+                        if kind == "QUEST_EXEC_REFRESH_GROUP_SUITE":
+                            require(len(pieces) == 2 and pieces[1].strip().isdigit(),
+                                    "Quest %d missing group suite in %s" % (row["subId"], entry))
+                            suite = int(pieces[1])
+                            require(0 <= suite <= suite_count,
+                                    "Quest %d requests group %d suite %d but Lua has %d" %
+                                    (row["subId"], group, suite, suite_count))
+                        else:
+                            event = ("EVENT_QUEST_FINISH" if field == "finishExec"
+                                     else "EVENT_QUEST_START")
+                            require(event in lua_text,
+                                    "Quest %d Lua group %d cannot receive %s" %
+                                    (row["subId"], group, event))
+                        verified += 1
+    return verified, len(cached)
+
+
 def check_act23_resources():
     routes = load("BinOutput/LevelDesign/Routes/scene20023_routes.json")
     require(routes.get("sceneId") == 20023, "Act II elevator route scene mismatch")
@@ -267,6 +351,7 @@ def main():
         require(not any(x.get("type") == "QUEST_EXEC_GRANT_TRIAL_AVATAR"
                         for x in rows.get(35301, {}).get("finishExec", [])),
                 "QuestExcel prematurely grants trial Amber")
+    act1_edges, act1_groups = check_act1_group_references(mains)
     scripts = set()
     check_scene(scripts)
     check_act23_resources()
@@ -274,6 +359,8 @@ def main():
     print("PASS static Mondstadt prologue: %d main quests, %d subquests, "
           "%d reviewed actions; %s" %
           (len(mains), count, len(ACTIONS), ", ".join(sorted(scripts))))
+    print("PASS Act I group link audit: %d group actions, %d distinct Lua files" %
+          (act1_edges, act1_groups))
     print("NOTE: does not prove chapter gameplay, scene lifecycle, or old save recovery")
 
 
