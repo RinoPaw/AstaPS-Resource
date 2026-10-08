@@ -1,0 +1,65 @@
+name: Mondstadt 7.1 prologue static contract
+
+on:
+  push:
+    branches:
+      - fix/mondstadt-71-rino-compat
+    paths:
+      - 'BinOutput/Quest/**'
+      - 'ExcelBinOutput/QuestExcelConfigData.json'
+      - 'Scripts/Scene/3/**'
+      - 'Scripts/Scene/20017/**'
+      - 'Scripts/Scene/20018/**'
+      - 'Scripts/Scene/20020/**'
+      - 'Scripts/Gadget/Test_LightLock.lua'
+      - 'Scripts/Gadget/tree.lua'
+      - 'BinOutput/LevelDesign/Routes/scene20023_routes.json'
+      - 'BinOutput/Ability/Temp/GadgetAbilities/ConfigAbility_Scene_Seal.json'
+      - 'BinOutput/Gadget/ConfigGadget_Npc.json'
+      - 'tools/audit_mondstadt_prologue.py'
+      - 'tools/report_mondstadt_quest_drift.py'
+      - 'tools/test_mondstadt_drift.py'
+      - '.github/workflows/mondstadt-prologue-audit.yml'
+  pull_request:
+    paths:
+      - 'BinOutput/Quest/**'
+      - 'ExcelBinOutput/QuestExcelConfigData.json'
+      - 'Scripts/Scene/3/**'
+      - 'Scripts/Scene/20017/**'
+      - 'Scripts/Scene/20018/**'
+      - 'Scripts/Scene/20020/**'
+      - 'Scripts/Gadget/Test_LightLock.lua'
+      - 'BinOutput/LevelDesign/Routes/scene20023_routes.json'
+      - 'BinOutput/Ability/Temp/GadgetAbilities/ConfigAbility_Scene_Seal.json'
+      - 'BinOutput/Gadget/ConfigGadget_Npc.json'
+      - 'tools/audit_mondstadt_prologue.py'
+      - 'tools/report_mondstadt_quest_drift.py'
+      - 'tools/test_mondstadt_drift.py'
+      - '.github/workflows/mondstadt-prologue-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Static validate all Mondstadt prologue main quests
+        run: python tools/audit_mondstadt_prologue.py
+      - name: Test drift classification semantics
+        run: python -m unittest discover -s tools -p 'test_mondstadt_drift.py'
+      - name: Report scoped QuestExcel compatibility drift
+        run: python tools/report_mondstadt_quest_drift.py
+      - name: Upload scoped drift evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mondstadt-quest-drift
+          path: mondstadt-quest-drift.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Focused Amber tutorial regression
+        run: python tools/verify_prologue_35301.py
