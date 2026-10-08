@@ -46,9 +46,12 @@ IMPLEMENTED_EXEC_TYPES = {
     "QUEST_EXEC_SET_IS_FLYABLE", "QUEST_EXEC_CHANGE_AVATAR_ELEMET",
     "QUEST_EXEC_SET_OPEN_STATE", "QUEST_EXEC_SET_QUEST_GLOBAL_VAR",
     "QUEST_EXEC_REFRESH_GROUP_MONSTER",
+    "QUEST_EXEC_SET_WEATHER_GADGET",
 }
-# Weather-gadget behavior is not verified. No substitute with Player.setWeather.
-KNOWN_UNIMPLEMENTED_EXEC_TYPES = {"QUEST_EXEC_SET_WEATHER_GADGET"}
+# The paired play/rino runtime has a registered SET_WEATHER_GADGET handler
+# (commit cd65df2), with a mapped 7.1 weather gadget ID in its outgoing
+# SceneAreaWeatherNotify. The visible scene effect still needs client testing.
+KNOWN_UNIMPLEMENTED_EXEC_TYPES = set()
 
 # Only narrowly confirmed historical actions are asserted. Empty modern beginExec
 # is NOT automatically treated as broken: some actions moved to other assets.
@@ -368,9 +371,9 @@ def main():
     for sub, (field, kind, params) in ACTIONS.items():
         require(sub in subs and expected_action(subs[sub], field, kind, params),
                 "Lost reviewed compatibility %d %s %s" % (sub, field, kind))
-    # The native/historical weather action has no verified server-side
-    # handler. Verify its quest context and cleanup actions without treating
-    # the second parameter as an invented climate ID.
+    # The paired rino branch handles these weather-area activation actions.
+    # Pin both activation and cleanup; avoid interpreting the second
+    # parameter as a climate ID.
     for field, params in [
         ("beginExec", ["3", "1"]),
         ("finishExec", ["3", "0"]),
@@ -412,7 +415,7 @@ def main():
             and distant_area.get("weatherAreaId") == 2150
             and distant_area.get("sceneID") == 4,
             "Weather gadget opcode first argument must be interpreted as weather area, not scene")
-    print("PASS 35901 weather-area evidence: area 3 storm (gadget 70020003); area 1 general; independent quest actor 70700004; opcode still unsupported")
+    print("PASS 35901 weather-area action contract: area 3 storm gadget 70020003; area 1 general gadget 70020001; paired server handler present; client effect unverified")
     for sub, predecessors in REQUIRED_ACCEPT_EDGES.items():
         require(sub in subs, "Missing reviewed acceptance node %d" % sub)
         for prev in predecessors:

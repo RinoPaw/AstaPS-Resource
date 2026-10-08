@@ -138,10 +138,13 @@ resource gate verifies both parts of this waypoint transition.
 ## Runtime QuestExec handler census
 
 The scoped static audit enumerates every begin/finish/fail execution action in
-all 40 MainQuests. Nineteen handler types are verified against the paired
-AstaPS branch. The remaining `QUEST_EXEC_SET_WEATHER_GADGET` is explicitly
-reported with subquest IDs; its semantics are not confirmed. Any newly seen
-unreviewed opcode fails CI instead of becoming an invisible gameplay defect.
+all 40 MainQuests. All twenty handler types are now present in the paired
+`fix/mondstadt-runtime-rino-71` AstaPS branch. The last action,
+`QUEST_EXEC_SET_WEATHER_GADGET`, was implemented in server commit
+`cd65df2` and maps 7.1 weather-area IDs to WeatherExcel gadget IDs in
+`SceneAreaWeatherNotify`. Server CI passes, but visible storm transitions
+remain unverified on a real 7.1 client. Any newly seen unreviewed opcode
+fails CI instead of becoming an invisible gameplay defect.
 
 ## 30901 all-three-dungeon logic and alternative objectives
 
@@ -182,15 +185,12 @@ static CI now checks the exact condition order and IDs.
 
 ## 35901 weather-gadget evidence boundary
 
-The 7.1 quest has SET_WEATHER_GADGET(3,1) on begin, then
-SET_WEATHER_GADGET(3,0) and (1,0) on finish. Separately, current 7.1
-`Scripts/Quest/Share/Q359ShareConfig.lua` declares the quest-owned
-`MengdeWindDragon` gadget (ID 70700004) in scene 3. These are correlated
-quest/weather-effect assets, but the relationship between the opcode's
-arguments and the client entity/weather system is not yet established.
-Do not invent a Player.setWeather mapping: WeatherExcel's regional weather
-IDs are a separate data model. Static CI checks all three actions and the
-VFX actor, and the unsupported opcode remains explicitly reported.
+The 7.1 quest activates weather area 3 at begin, and disables areas 3
+and 1 at finish. The Q359 Lua configuration also declares a separate
+quest-owned `MengdeWindDragon` VFX actor (gadget 70700004). The paired
+server now maps weather-area activation to the corresponding 7.1 weather
+gadget in SceneAreaWeatherNotify. The independent VFX actor remains
+separate; CI asserts all actions and assets, but cannot verify rendering.
 
 ## Verified SET_WEATHER_GADGET parameter meaning
 
@@ -208,6 +208,7 @@ For the opening Stormterror scene:
 Thus 35901's `[3,1]`, `[3,0]`, `[1,0]` operate on weather-area gadget
 activation. Their visible environmental effects cannot be reproduced by
 mistaking 3 for a scene ID, 1 for a climate type, or spawning 70700004
-as the WeatherExcel gadget. The 7.1 resource CI now pins these joins.
-Server-side effect realization remains unverified and is not silently
-claimed as complete.
+as the WeatherExcel gadget. The 7.1 resource CI now pins these joins. The paired server
+`fix/mondstadt-runtime-rino-71` has an implemented opcode handler and
+passes CI. Whether the 7.1 client displays the intended storm and cleanup
+needs end-to-end validation.
