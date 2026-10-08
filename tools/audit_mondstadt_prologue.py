@@ -17,6 +17,22 @@ SCOPE = {
     "act2": (370, 371, 372, 373, 374, 375, 376, 377, 20101, 379, 380, 381, 382, 383, 384),
     "act3": (397, 388, 389, 390, 393, 394, 398, 396),
 }
+# Handler coverage reviewed in the paired AstaPS integration branch.
+IMPLEMENTED_EXEC_TYPES = {
+    "QUEST_EXEC_REFRESH_GROUP_SUITE", "QUEST_EXEC_NOTIFY_GROUP_LUA",
+    "QUEST_EXEC_ADD_CUR_AVATAR_ENERGY", "QUEST_EXEC_GRANT_TRIAL_AVATAR",
+    "QUEST_EXEC_DEL_PACK_ITEM", "QUEST_EXEC_DEL_PACK_ITEM_BATCH",
+    "QUEST_EXEC_ADD_QUEST_PROGRESS", "QUEST_EXEC_UNLOCK_POINT",
+    "QUEST_EXEC_LOCK_POINT", "QUEST_EXEC_UNLOCK_AREA",
+    "QUEST_EXEC_ROLLBACK_QUEST", "QUEST_EXEC_REMOVE_TRIAL_AVATAR",
+    "QUEST_EXEC_SET_IS_GAME_TIME_LOCKED", "QUEST_EXEC_SET_IS_WEATHER_LOCKED",
+    "QUEST_EXEC_SET_IS_FLYABLE", "QUEST_EXEC_CHANGE_AVATAR_ELEMET",
+    "QUEST_EXEC_SET_OPEN_STATE", "QUEST_EXEC_SET_QUEST_GLOBAL_VAR",
+    "QUEST_EXEC_REFRESH_GROUP_MONSTER",
+}
+# Weather-gadget behavior is not verified. No substitute with Player.setWeather.
+KNOWN_UNIMPLEMENTED_EXEC_TYPES = {"QUEST_EXEC_SET_WEATHER_GADGET"}
+
 # Only narrowly confirmed historical actions are asserted. Empty modern beginExec
 # is NOT automatically treated as broken: some actions moved to other assets.
 ACTIONS = {
@@ -275,6 +291,7 @@ def check_reviewed_later_acts(subs):
 
 def main():
     mains, subs, count = {}, {}, 0
+    action_uses = {}
     for chapter, ids in SCOPE.items():
         for main_id in ids:
             path = Path("BinOutput/Quest/%d.json" % main_id)
@@ -292,9 +309,22 @@ def main():
                 count += 1
                 for field in ("finishCond", "failCond", "finishExec", "failExec", "beginExec"):
                     for entry in row.get(field, []):
-                        require(isinstance(entry.get("type"), str),
+                        kind = entry.get("type")
+                        require(isinstance(kind, str),
                                 "Unnamed %s for %d" % (field, sub))
+                        if field.endswith("Exec"):
+                            action_uses.setdefault(kind, []).append((sub, field))
             print("%s: %d main quests" % (chapter, len(ids)))
+    unexpected = sorted(set(action_uses) - IMPLEMENTED_EXEC_TYPES -
+                        KNOWN_UNIMPLEMENTED_EXEC_TYPES)
+    require(not unexpected, "Quest actions without reviewed Java handlers: %s" %
+            {kind: action_uses[kind][:8] for kind in unexpected})
+    for kind in sorted(set(action_uses) & KNOWN_UNIMPLEMENTED_EXEC_TYPES):
+        print("KNOWN UNSUPPORTED quest action: %s uses=%d sample=%s" %
+              (kind, len(action_uses[kind]), action_uses[kind][:8]))
+    print("PASS handler type census: %d action types, %d supported, %d known missing" %
+          (len(action_uses), len(set(action_uses) & IMPLEMENTED_EXEC_TYPES),
+           len(set(action_uses) & KNOWN_UNIMPLEMENTED_EXEC_TYPES)))
     for sub, (field, kind, params) in ACTIONS.items():
         require(sub in subs and expected_action(subs[sub], field, kind, params),
                 "Lost reviewed compatibility %d %s %s" % (sub, field, kind))

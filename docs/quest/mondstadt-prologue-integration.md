@@ -134,3 +134,11 @@ world entities.
 finishExec then locks scene 3 point 1720. AstaPS now has an explicit
 `QUEST_EXEC_LOCK_POINT` handler, separate from unlocking 3/6. The static
 resource gate verifies both parts of this waypoint transition.
+
+## Runtime QuestExec handler census
+
+The scoped static audit enumerates every begin/finish/fail execution action in
+all 40 MainQuests. Nineteen handler types are verified against the paired
+AstaPS branch. The remaining `QUEST_EXEC_SET_WEATHER_GADGET` is explicitly
+reported with subquest IDs; its semantics are not confirmed. Any newly seen
+unreviewed opcode fails CI instead of becoming an invisible gameplay defect.
