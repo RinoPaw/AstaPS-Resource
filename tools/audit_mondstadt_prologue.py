@@ -29,6 +29,17 @@ ACTIONS = {
     36003: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003136,1"]),
     35901: ("beginExec", "QUEST_EXEC_SET_WEATHER_GADGET", ["3", "1"]),
     30904: ("beginExec", "QUEST_EXEC_ADD_QUEST_PROGRESS", ["359011", "1"]),
+    37303: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001305,2"]),
+    2010102: ("beginExec", "QUEST_EXEC_GRANT_TRIAL_AVATAR", ["11"]),
+    38202: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001249,2"]),
+    39703: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133002233,2"]),
+    38905: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133007227"]),
+    39003: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133007227"]),
+    39401: ("beginExec", "QUEST_EXEC_UNLOCK_POINT", ["3", "38"]),
+    39801: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003910,2"]),
+    39808: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133004917,1"]),
+    39812: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003910"]),
+    39604: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001910,2"]),
 }
 COMBINATORS = {31101: "LOGIC_OR", 35901: "LOGIC_OR"}
 CHAPTER_BEGIN = {1001: 36301, 1002: 37004, 1003: 39705}
@@ -129,6 +140,42 @@ def check_act23_resources():
     require("seal_battle_done" in final, "Third seal missing battle-complete guard")
 
 
+def check_reviewed_later_acts(subs):
+    require(expected_action(subs[2010101], "beginExec",
+                            "QUEST_EXEC_DEL_PACK_ITEM", ["100175", "1"]),
+            "2010101 must consume the hideout key")
+    require(expected_action(subs[2010101], "beginExec",
+                            "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133002334,2"]),
+            "2010101 must activate hideout gadget group")
+    require(expected_action(subs[2010151], "finishExec",
+                            "QUEST_EXEC_REMOVE_TRIAL_AVATAR", ["11"]),
+            "2010102 trial avatar must be revoked on dungeon exit")
+    require(expected_action(subs[38402], "failExec",
+                            "QUEST_EXEC_ROLLBACK_QUEST", ["38401"]),
+            "38402 failure must enable retry")
+    reward_ids = {37203: 100164, 38303: 100163, 38406: 100165}
+    reward_ids.update({sub: 100175 for sub in (
+        2010145, 2010146, 2010147, 2010148, 2010149, 2010150, 2010151)})
+    for sub, item in reward_ids.items():
+        require(subs[sub].get("gainItems") == [{"itemId": item, "count": 1}],
+                "Missing quest reward %d in %d" % (item, sub))
+    for gid, tokens in {
+        133001305: ("monsters = { 1307 }",),
+        133002334: ("gadgets = { 334001 }",),
+        133001249: ("gadgets = { 2883 }",),
+        133002233: ("monsters = { 870, 871, 872 }",),
+        133007227: ('source = "38905"', 'source = "39003"',
+                      'AddQuestProgress(context, "39003_success")'),
+        133003910: ('source = "39812"', 'AddQuestProgress(context, "133003910")'),
+        133004917: ("suites = {",),
+        133001910: ("gadgets = { 910001 }",),
+    }.items():
+        lua_content = lua(gid)
+        for token in tokens:
+            require(token in lua_content,
+                    "Group %d lacks evidence token: %s" % (gid, token))
+
+
 def main():
     mains, subs, count = {}, {}, 0
     for chapter, ids in SCOPE.items():
@@ -198,6 +245,7 @@ def main():
     scripts = set()
     check_scene(scripts)
     check_act23_resources()
+    check_reviewed_later_acts(subs)
     print("PASS static Mondstadt prologue: %d main quests, %d subquests, "
           "%d reviewed actions; %s" %
           (len(mains), count, len(ACTIONS), ", ".join(sorted(scripts))))

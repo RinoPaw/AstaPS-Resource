@@ -89,3 +89,22 @@ quest-triggered slime waves: 35303 -> group 133003448 -> monsters 440,441;
 progress 1330030023/4, chained through 35310/35311. The 35304 burst-energy
 action is required. These links are native 7.1 Lua evidence corroborating
 the retained compatibility beginExec; they do not prove in-game visibility.
+
+## Further reviewed Act II / Act III compatibility
+
+Historical GCResource 3.7 and 4.0 agree on the restored actions. The
+current 7.1 Lua files confirm the referenced group suites, monster configs
+and quest-start notification sources:
+
+- 37303, 38202, 39703: start the scene groups required by objectives.
+- 2010101: consume hideout key and enable gadget; 2010102: trial 11,
+  matched by its existing removal at 2010151; seven key-reward branches.
+- 37203, 38303, 38406: story items 100164, 100163, 100165.
+- 38402: rollback on fail; 38905 / 39003: Lua group 133007227.
+- 39401: unlock point 3/38 for dungeon approach.
+- 39801, 39808, 39812, 39604: closing-act gadget suites and Lua link.
+
+We intentionally did not import historical 37903 gainItems(1021):
+permanent Amber is already restored in 35402 and a second grant requires
+7.1-specific evidence. None of the compatibility restorations claims to
+be a native 7.1 beginExec/acceptCond field.

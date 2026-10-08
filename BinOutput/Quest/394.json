@@ -48,6 +48,15 @@
           ],
           "param_str": ""
         }
+      ],
+      "beginExec": [
+        {
+          "param": [
+            "3",
+            "38"
+          ],
+          "type": "QUEST_EXEC_UNLOCK_POINT"
+        }
       ]
     },
     {
