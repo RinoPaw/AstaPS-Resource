@@ -80,3 +80,12 @@ value; the scoped report normalizes that layout. Missing BinOutput compatibility
 is counted separately, not treated as a proven Excel defect. Predecessor,
 combinator and Quest-0 placeholder conflicts remain visible but are evidence
 candidates, never automatically overwritten or promoted to 7.1 native data.
+
+## Act I elemental tutorial sequence
+
+The static gate now verifies the first fire slime (35302/439) and the later
+quest-triggered slime waves: 35303 -> group 133003448 -> monsters 440,441;
+35304 -> group 133003449 -> monsters 442..445. Both Lua groups must send
+progress 1330030023/4, chained through 35310/35311. The 35304 burst-energy
+action is required. These links are native 7.1 Lua evidence corroborating
+the retained compatibility beginExec; they do not prove in-game visibility.

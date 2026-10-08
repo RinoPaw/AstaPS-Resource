@@ -22,6 +22,8 @@ SCOPE = {
 ACTIONS = {
     35301: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,1"]),
     35302: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,2"]),
+    35303: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003448"]),
+    35304: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003449"]),
     35404: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003439"]),
     36001: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003435,1"]),
     36003: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003136,1"]),
@@ -70,6 +72,23 @@ def check_scene(scripts):
     a = lua(133003002)
     require(re.search(r"monsters\s*=\s*\{\s*439\s*\}", a), "35302 slime suite absent")
     require('ScriptLib.AddQuestProgress(context, "1330030022")' in a, "35302 kill notification missing")
+    # Later tutorial waves are quest-start-triggered: the task must emit the
+    # Lua event, which in turn creates the actual world monsters.
+    for sub, gid, monster_configs, progress in [
+        (35303, 133003448, (440, 441), "1330030023"),
+        (35304, 133003449, (442, 443, 444, 445), "1330030024"),
+    ]:
+        group_lua = lua(gid)
+        require('source = "%d"' % sub in group_lua,
+                "Quest %d has no Lua QUEST_START trigger" % sub)
+        for config in monster_configs:
+            require(re.search(
+                r"ScriptLib\.CreateMonster\(context,\s*\{\s*config_id\s*=\s*%d\b" % config,
+                group_lua,
+            ), "Quest %d cannot create tutorial slime config %d" % (sub, config))
+        require('ScriptLib.AddQuestProgress(context, "%s")' % progress in group_lua,
+                "Quest %d wave has no completion Lua progress" % sub)
+
     a = lua(133003439)
     for token in ('source = "35404"', 'config_id = 3834',
                   'ScriptLib.CreateGadget(context, { config_id = 3834 })',
@@ -87,7 +106,7 @@ def check_scene(scripts):
                     "Group %d suite 1 missing monster %d" % (gid, config))
         require('ScriptLib.AddQuestProgress(context, "%s")' % progress in a,
                 "Group %d missing quest progress trigger" % gid)
-    scripts.add("353 slime, 354 target, 360 hilichurl groups")
+    scripts.add("353 first/second/third slime waves, 354 target, 360 hilichurl groups")
 
 
 def check_act23_resources():
@@ -142,6 +161,16 @@ def main():
             "35301 incorrectly grants Amber before Anemo tutorial")
     require(subs[35402].get("gainItems") == [{"itemId": 1021, "count": 1}],
             "35402 must give Amber's encounter reward")
+    require(expected_action(subs[35304], "beginExec",
+                            "QUEST_EXEC_ADD_CUR_AVATAR_ENERGY", []),
+            "35304 needs elemental burst energy during third slime wave")
+    for sub, progress in ((35309, "1330030022"),
+                          (35310, "1330030023"),
+                          (35311, "1330030024")):
+        require(any(c.get("type") == "QUEST_CONTENT_LUA_NOTIFY"
+                    and c.get("param_str") == progress
+                    for c in subs[sub].get("finishCond", [])),
+                "Quest %d is disconnected from slime wave %s" % (sub, progress))
     require(has_condition(subs[36301], "QUEST_COND_STATE_EQUAL", 35202, 3),
             "Chapter 1001 must open only after 35202")
     for chapter, sub in CHAPTER_BEGIN.items():
