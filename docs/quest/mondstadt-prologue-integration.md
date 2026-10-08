@@ -1,0 +1,59 @@
+# Genshin 7.1 Mondstadt Prologue integration contract
+
+Scope: birth/prelude plus Prologue Acts I, II and III through 39604; derived
+from RinoPaw/Genshin-Reverse versioned Mondstadt mainline manifest. Quest 361 is
+the WQ-typed transition for the 353 -> 355 forest segment, included only as a
+support check. Hidden chapter controllers 363, 370 and 397 must not be
+linearized with visible objectives.
+
+## Ownership (do not substitute one source for another)
+
+- **Client-native**: current 7.1 QuestExcel and full Quest fields recovered
+  by Genshin-Reverse. Full Quest owns finishCond/failCond/finishExec/failExec;
+  ordinary acceptCond/beginExec do not belong to the 7.1 full Quest payload.
+- **Compatibility**: reviewed historical 3.7 and 4.0 Quest beginExec,
+  corroborated by current 7.1 Lua group suites and their progress events.
+  These are explicitly NOT recovered 7.1 native beginExec.
+- **Asta materialization**: current QuestExcel flattened accept conditions
+  may include previous-physical-row chains. These are not evidence of native
+  7.1 prerequisites and must not override verified chapter logic.
+- **Server runtime**: PR #71 and companion PR #87 / previously merged #84.
+  Suite dispatch needs script initialization and group persistence, quest
+  event delivery, real NPC/talk handling, object callbacks and scene effects.
+
+## Reviewed compatibility restorations
+
+| Subquest | Recovered semantic action | Evidence |
+| --- | --- | --- |
+| 35301 / 35302 | scene 3 group 133003002 suite 1 / 2 | original pre-c98b896710 resource; 7.1 Lua |
+| 35402 | reward item 1021 | historical GCResource 3700/4000 |
+| 35404 | notify scene 3 group 133003439 | GCResource; current Lua 35404 trigger |
+| 36001 | scene 3 group 133003435 suite 1 | GCResource 3700+4000; current 7.1 Lua suite 1 monster 1442 / quest progress |
+| 36003 | scene 3 group 133003136 suite 1 | GCResource 3700+4000; current 7.1 Lua suite 1 monsters 623,1443,1444 / quest progress |
+| 35901 | SET_WEATHER_GADGET (3,1) on begin | GCResource 3700+4000, matching historical 359 progression |
+| 30904 | ADD_QUEST_PROGRESS 359011 by 1 on begin | GCResource 3700+4000, supports 359 branch |
+| 31101 / 35901 | finishCondComb LOGIC_OR | both historical versions; #13 also repairs |
+| 35301 | no early GRANT_TRIAL_AVATAR | proven accidental addition c98b896710 |
+
+All materialized actions remain source-scoped; no hardcoded quest-ID runtime
+bypass. This table is a *minimum proved subset*, not proof that the remaining
+Mondstadt quest graphs are correct or complete.
+
+## Static checks and open integration risks
+
+Run `python tools/audit_mondstadt_prologue.py` and
+`python tools/verify_prologue_35301.py` with 7.1 Resource data. The audit
+checks the whole scoped MainQuest population and exact actions above, plus
+scene Lua linkage and spreadsheet override conflicts where present. Unknown
+`acceptCond` and `beginExec` are not fabricated. This cannot exercise:
+
+1. Real-time server event to quest completion / action execution.
+2. Quest-owned monster lifetime across scene loading and group replacement.
+3. Prologue Acts II/III mechanics (chest drops, elevators, seal battles,
+   Dungeon scene re-entry, Stormterror combat); these need specific PR #13/#87
+   review and matching runtime support before a full-client-test claim.
+4. Existing saved accounts stuck in older task state.
+
+Do not request a client test before the full CI gates are green. Existing
+generic prerequisite audit failures outside this scope must be reported
+separately; they are not evidence this new scoped check passed.

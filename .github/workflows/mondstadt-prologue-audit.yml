@@ -1,0 +1,34 @@
+name: Mondstadt 7.1 prologue static contract
+
+on:
+  push:
+    branches:
+      - integrate/mondstadt-prologue-71
+    paths:
+      - 'BinOutput/Quest/**'
+      - 'ExcelBinOutput/QuestExcelConfigData.json'
+      - 'Scripts/Scene/3/**'
+      - 'tools/audit_mondstadt_prologue.py'
+      - '.github/workflows/mondstadt-prologue-audit.yml'
+  pull_request:
+    paths:
+      - 'BinOutput/Quest/**'
+      - 'ExcelBinOutput/QuestExcelConfigData.json'
+      - 'Scripts/Scene/3/**'
+      - 'tools/audit_mondstadt_prologue.py'
+      - '.github/workflows/mondstadt-prologue-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Static validate all Mondstadt prologue main quests
+        run: python tools/audit_mondstadt_prologue.py
+      - name: Focused Amber tutorial regression
+        run: python tools/verify_prologue_35301.py
