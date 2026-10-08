@@ -41,6 +41,18 @@ ACTIONS = {
     39812: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003910"]),
     39604: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133001910,2"]),
 }
+# Explicit acceptance edges recovered from historical compatibility and corroborated by
+# current 7.1 chapter/tutorial flow. Do not infer missing acceptCond from file order.
+REQUIRED_ACCEPT_EDGES = {
+    35101: (35100,), 35200: (35102,), 35301: (35205,),
+    35302: (35301,), 35309: (35302,), 35303: (35309,),
+    35310: (35303,), 35304: (35310,), 35311: (35304,),
+    35501: (35311,), 35502: (35501, 36101), 35503: (35502,),
+    35504: (35503,), 35505: (35504,), 35401: (35505,),
+    35403: (35404,), 36001: (35403,), 36003: (36001,),
+    36301: (35202,), 37001: (31101,), 39701: (38406,),
+}
+
 COMBINATORS = {31101: "LOGIC_OR", 35901: "LOGIC_OR"}
 CHAPTER_BEGIN = {1001: 36301, 1002: 37004, 1003: 39705}
 CHAPTER_END = {1001: 31101, 1002: 38406, 1003: 39604}
@@ -201,6 +213,19 @@ def main():
     for sub, (field, kind, params) in ACTIONS.items():
         require(sub in subs and expected_action(subs[sub], field, kind, params),
                 "Lost reviewed compatibility %d %s %s" % (sub, field, kind))
+    for sub, predecessors in REQUIRED_ACCEPT_EDGES.items():
+        require(sub in subs, "Missing reviewed acceptance node %d" % sub)
+        for prev in predecessors:
+            require(prev in subs, "Missing reviewed predecessor %d for %d" % (prev, sub))
+            require(has_condition(subs[sub], "QUEST_COND_STATE_EQUAL", prev, 3),
+                    "Lost quest handoff %d -> %d" % (prev, sub))
+    # The forest handoff needs BOTH the task completion and the WQ scene event.
+    require(subs[35502].get("acceptCondComb") == "LOGIC_AND",
+            "35502 must wait for forest plot and scene event")
+    # The hilltop-to-chapter controller is an independent branch; do not open it at birth.
+    require(has_condition(subs[36301], "QUEST_COND_STATE_EQUAL", 35202, 3),
+            "36301 chapter banner must wait for 35202")
+
     for sub, logic in COMBINATORS.items():
         require(subs[sub].get("finishCondComb") == logic, "%d must combine finish with %s" % (sub, logic))
     require(not any(x.get("type") == "QUEST_EXEC_GRANT_TRIAL_AVATAR"

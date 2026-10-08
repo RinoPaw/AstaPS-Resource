@@ -108,3 +108,12 @@ We intentionally did not import historical 37903 gainItems(1021):
 permanent Amber is already restored in 35402 and a second grant requires
 7.1-specific evidence. None of the compatibility restorations claims to
 be a native 7.1 beginExec/acceptCond field.
+
+## Static quest acceptance handoff contract
+
+The prelude/Act I audit pins the verified 351 -> 352 -> 353 -> 355/361 ->
+354 -> 360 transitions, including the two tutorial slime wave handoffs and
+both 360 combat group starts. The 35502 plot/scene join requires LOGIC_AND.
+The Act II and III entry edges 31101 -> 37001 and 38406 -> 39701 are
+also checked. Unknown chapter-controller acceptance is not reconstructed
+from numeric ordering or guessed from a missing acceptCond record.
