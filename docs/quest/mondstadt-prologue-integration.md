@@ -152,3 +152,14 @@ first dungeon falsely completes the multi-dungeon task. 30710, 30810
 and 30814 use LOGIC_OR for alternative talk/object objectives. Both
 resource combinators and the matching server-side full Quest loader
 are included in this integration; static CI checks the exact IDs.
+
+## Scoped accept/content handler census
+
+The same 40-MainQuest gate now enumerates every acceptCond, finishCond and
+failCond, including repeatable death and dungeon failure conditions. All
+observed types have registered Java content/condition handlers in the paired
+AstaPS integration branch: two accept-condition types and nineteen
+finish/fail content types. The previously absent QUEST_CONTENT_TEAM_DEAD
+handler and full-team death event are included there. This census checks
+handler presence; it does not prove a Lua/client event actually fires.
+New condition types are CI-blocking until reviewed.

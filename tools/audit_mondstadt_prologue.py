@@ -18,6 +18,23 @@ SCOPE = {
     "act3": (397, 388, 389, 390, 393, 394, 398, 396),
 }
 # Handler coverage reviewed in the paired AstaPS integration branch.
+# The set covers every accept, finish and fail opcode encountered in these 40
+# MainQuests. Missing content event *sources* still need runtime testing.
+IMPLEMENTED_ACCEPT_TYPES = {
+    "QUEST_COND_STATE_EQUAL", "QUEST_COND_STATE_NOT_EQUAL",
+}
+IMPLEMENTED_CONTENT_TYPES = {
+    "QUEST_CONTENT_FINISH_PLOT", "QUEST_CONTENT_TRIGGER_FIRE",
+    "QUEST_CONTENT_UNLOCK_TRANS_POINT", "QUEST_CONTENT_ADD_QUEST_PROGRESS",
+    "QUEST_CONTENT_COMPLETE_TALK", "QUEST_CONTENT_SKILL",
+    "QUEST_CONTENT_LUA_NOTIFY", "QUEST_CONTENT_OBTAIN_ITEM",
+    "QUEST_CONTENT_ENTER_DUNGEON", "QUEST_CONTENT_ENTER_MY_WORLD",
+    "QUEST_CONTENT_GAME_TIME_TICK", "QUEST_CONTENT_ENTER_ROOM",
+    "QUEST_CONTENT_DESTROY_GADGET", "QUEST_CONTENT_FAIL_DUNGEON",
+    "QUEST_CONTENT_FINISH_DUNGEON", "QUEST_CONTENT_TEAM_DEAD",
+    "QUEST_CONTENT_NOT_FINISH_PLOT", "QUEST_CONTENT_CLEAR_GROUP_MONSTER",
+    "QUEST_CONTENT_INTERACT_GADGET",
+}
 IMPLEMENTED_EXEC_TYPES = {
     "QUEST_EXEC_REFRESH_GROUP_SUITE", "QUEST_EXEC_NOTIFY_GROUP_LUA",
     "QUEST_EXEC_ADD_CUR_AVATAR_ENERGY", "QUEST_EXEC_GRANT_TRIAL_AVATAR",
@@ -296,6 +313,8 @@ def check_reviewed_later_acts(subs):
 def main():
     mains, subs, count = {}, {}, 0
     action_uses = {}
+    accept_uses = {}
+    content_uses = {}
     for chapter, ids in SCOPE.items():
         for main_id in ids:
             path = Path("BinOutput/Quest/%d.json" % main_id)
@@ -311,14 +330,27 @@ def main():
                 require(row.get("mainId") == main_id, "Bad parent for %d" % sub)
                 subs[sub] = row
                 count += 1
-                for field in ("finishCond", "failCond", "finishExec", "failExec", "beginExec"):
+                for field in ("acceptCond", "finishCond", "failCond",
+                              "finishExec", "failExec", "beginExec"):
                     for entry in row.get(field, []):
                         kind = entry.get("type")
                         require(isinstance(kind, str),
                                 "Unnamed %s for %d" % (field, sub))
-                        if field.endswith("Exec"):
+                        if field == "acceptCond":
+                            accept_uses.setdefault(kind, []).append(sub)
+                        elif field in ("finishCond", "failCond"):
+                            content_uses.setdefault(kind, []).append((sub, field))
+                        else:
                             action_uses.setdefault(kind, []).append((sub, field))
             print("%s: %d main quests" % (chapter, len(ids)))
+    unsupported_accept = sorted(set(accept_uses) - IMPLEMENTED_ACCEPT_TYPES)
+    unsupported_content = sorted(set(content_uses) - IMPLEMENTED_CONTENT_TYPES)
+    require(not unsupported_accept, "Quest accepts without Java handlers: %s" %
+            {kind: accept_uses[kind][:8] for kind in unsupported_accept})
+    require(not unsupported_content, "Quest content/fail conditions without Java handlers: %s" %
+            {kind: content_uses[kind][:8] for kind in unsupported_content})
+    print("PASS condition census: %d accept types, %d finish/fail types" %
+          (len(accept_uses), len(content_uses)))
     unexpected = sorted(set(action_uses) - IMPLEMENTED_EXEC_TYPES -
                         KNOWN_UNIMPLEMENTED_EXEC_TYPES)
     require(not unexpected, "Quest actions without reviewed Java handlers: %s" %
