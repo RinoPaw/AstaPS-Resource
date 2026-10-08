@@ -655,6 +655,7 @@
       ]
     },
     {
+      "finishCondComb": "LOGIC_OR",
       "finishCond": [
         {
           "param": [

@@ -12,6 +12,7 @@
   "id": 382,
   "subQuests": [
     {
+      "finishCondComb": "LOGIC_OR",
       "finishCond": [
         {
           "param": [
