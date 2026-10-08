@@ -142,3 +142,13 @@ all 40 MainQuests. Nineteen handler types are verified against the paired
 AstaPS branch. The remaining `QUEST_EXEC_SET_WEATHER_GADGET` is explicitly
 reported with subquest IDs; its semantics are not confirmed. Any newly seen
 unreviewed opcode fails CI instead of becoming an invisible gameplay defect.
+
+## 30901 all-three-dungeon logic and alternative objectives
+
+GCResource 3700 and 4000 independently preserve `finishCondComb=LOGIC_AND`
+for 30901 with FINISH_DUNGEON IDs 1001, 1, 1003; without it,
+QuestData's missing combinator defaults to LOGIC_NONE (OR-like) and the
+first dungeon falsely completes the multi-dungeon task. 30710, 30810
+and 30814 use LOGIC_OR for alternative talk/object objectives. Both
+resource combinators and the matching server-side full Quest loader
+are included in this integration; static CI checks the exact IDs.

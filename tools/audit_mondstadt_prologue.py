@@ -70,7 +70,11 @@ REQUIRED_ACCEPT_EDGES = {
     36301: (35202,), 37001: (31101,), 39701: (38406,),
 }
 
-COMBINATORS = {31101: "LOGIC_OR", 35901: "LOGIC_OR"}
+COMBINATORS = {
+    31101: "LOGIC_OR", 35901: "LOGIC_OR",
+    30710: "LOGIC_OR", 30810: "LOGIC_OR", 30814: "LOGIC_OR",
+    30901: "LOGIC_AND",
+}
 CHAPTER_BEGIN = {1001: 36301, 1002: 37004, 1003: 39705}
 CHAPTER_END = {1001: 31101, 1002: 38406, 1003: 39604}
 
@@ -350,6 +354,10 @@ def main():
     require(not any(x.get("type") == "QUEST_EXEC_GRANT_TRIAL_AVATAR"
                     for x in subs[35301].get("finishExec", [])),
             "35301 incorrectly grants Amber before Anemo tutorial")
+    dungeon_ids = [tuple(c.get("param", [])) for c in subs[30901].get("finishCond", [])
+                   if c.get("type") == "QUEST_CONTENT_FINISH_DUNGEON"]
+    require(dungeon_ids == [(1001, 0), (1, 0), (1003, 0)],
+            "30901 must require all three distinct dungeon completions")
     require(subs[35402].get("gainItems") == [{"itemId": 1021, "count": 1}],
             "35402 must give Amber's encounter reward")
     require(expected_action(subs[35304], "beginExec",
