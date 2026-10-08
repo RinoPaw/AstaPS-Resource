@@ -191,3 +191,23 @@ arguments and the client entity/weather system is not yet established.
 Do not invent a Player.setWeather mapping: WeatherExcel's regional weather
 IDs are a separate data model. Static CI checks all three actions and the
 VFX actor, and the unsupported opcode remains explicitly reported.
+
+## Verified SET_WEATHER_GADGET parameter meaning
+
+Historical GCResource 4.0 confirms the opcode's first parameter can be
+`2150` and the second parameter is an activation flag (`0` or `1`).
+The 7.1 `WeatherExcelConfigData.json` maps weather area 2150 to **scene 4**,
+so that parameter cannot simply be treated as a scene ID.
+
+For the opening Stormterror scene:
+- Weather area **3** uses `ESP_Md_City_Storm`, gadget **70020003** and scene **3**.
+- Weather area **1** uses `ESP_Md_General`, gadget **70020001** and scene **3**.
+- Weather area **2** uses `ESP_Md_WindDragon`, gadget **70020002** and scene **3**.
+- The independent Q359 quest VFX actor `MengdeWindDragon` is gadget **70700004**.
+
+Thus 35901's `[3,1]`, `[3,0]`, `[1,0]` operate on weather-area gadget
+activation. Their visible environmental effects cannot be reproduced by
+mistaking 3 for a scene ID, 1 for a climate type, or spawning 70700004
+as the WeatherExcel gadget. The 7.1 resource CI now pins these joins.
+Server-side effect realization remains unverified and is not silently
+claimed as complete.

@@ -390,7 +390,29 @@ def main():
             and 'alias = "MengdeWindDragon"' in quest359_actor.group(1)
             and re.search(r"\bscene_id\s*=\s*3\b", quest359_actor.group(1)),
             "35901 Stormterror weather VFX quest gadget lost from Q359 config")
-    print("PASS 35901 weather-gadget evidence: activation, two cleanup actions, quest VFX actor; opcode still unsupported")
+    # The first weather-gadget argument indexes WeatherExcel.areaID, not a
+    # scene ID or climate enum. Area 2150, used by Q40016, belongs to scene 4:
+    # the numeric weather area and the scene can be different.
+    weather_rows = load(Path("ExcelBinOutput/WeatherExcelConfigData.json"))
+    weather_areas = {row["areaID"]: row for row in weather_rows}
+    for area_id, scene_id, gadget_id, profile_suffix in [
+        (1, 3, 70020001, "ESP_Md_General"),
+        (2, 3, 70020002, "ESP_Md_WindDragon"),
+        (3, 3, 70020003, "ESP_Md_City_Storm"),
+    ]:
+        area = weather_areas.get(area_id)
+        require(area is not None
+                and area.get("weatherAreaId") == area_id
+                and area.get("sceneID") == scene_id
+                and area.get("gadgetID") == gadget_id
+                and area.get("profileName", "").endswith(profile_suffix),
+                "WeatherExcel lost native weather-area/gadget metadata for %d" % area_id)
+    distant_area = weather_areas.get(2150)
+    require(distant_area is not None
+            and distant_area.get("weatherAreaId") == 2150
+            and distant_area.get("sceneID") == 4,
+            "Weather gadget opcode first argument must be interpreted as weather area, not scene")
+    print("PASS 35901 weather-area evidence: area 3 storm (gadget 70020003); area 1 general; independent quest actor 70700004; opcode still unsupported")
     for sub, predecessors in REQUIRED_ACCEPT_EDGES.items():
         require(sub in subs, "Missing reviewed acceptance node %d" % sub)
         for prev in predecessors:
