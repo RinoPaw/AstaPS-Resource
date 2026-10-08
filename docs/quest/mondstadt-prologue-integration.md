@@ -127,3 +127,10 @@ including the scene 1004 dungeon group. Quest-start or quest-finish
 notifications must target a script with the corresponding event type. This
 remains structural validation; it does not execute ScriptLib or check loaded
 world entities.
+
+## Prelude lock point handler
+
+35106 finishes when scene 3 waypoint 6 unlocks; its native/historical
+finishExec then locks scene 3 point 1720. AstaPS now has an explicit
+`QUEST_EXEC_LOCK_POINT` handler, separate from unlocking 3/6. The static
+resource gate verifies both parts of this waypoint transition.

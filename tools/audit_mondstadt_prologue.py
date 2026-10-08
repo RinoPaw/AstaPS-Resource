@@ -20,6 +20,7 @@ SCOPE = {
 # Only narrowly confirmed historical actions are asserted. Empty modern beginExec
 # is NOT automatically treated as broken: some actions moved to other assets.
 ACTIONS = {
+    35106: ("finishExec", "QUEST_EXEC_LOCK_POINT", ["3", "1720"]),
     35301: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,1"]),
     35302: ("beginExec", "QUEST_EXEC_REFRESH_GROUP_SUITE", ["3", "133003002,2"]),
     35303: ("beginExec", "QUEST_EXEC_NOTIFY_GROUP_LUA", ["3", "133003448"]),
@@ -312,6 +313,10 @@ def main():
 
     for sub, logic in COMBINATORS.items():
         require(subs[sub].get("finishCondComb") == logic, "%d must combine finish with %s" % (sub, logic))
+    require(any(c.get("type") == "QUEST_CONTENT_UNLOCK_TRANS_POINT"
+                and c.get("param") == [3, 6]
+                for c in subs[35106].get("finishCond", [])),
+            "35106 must finish from unlocking waypoint 3/6")
     require(not any(x.get("type") == "QUEST_EXEC_GRANT_TRIAL_AVATAR"
                     for x in subs[35301].get("finishExec", [])),
             "35301 incorrectly grants Amber before Anemo tutorial")
