@@ -30,5 +30,15 @@ jobs:
           python-version: '3.11'
       - name: Static validate all Mondstadt prologue main quests
         run: python tools/audit_mondstadt_prologue.py
+      - name: Report scoped QuestExcel compatibility drift
+        run: python tools/report_mondstadt_quest_drift.py
+      - name: Upload scoped drift evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mondstadt-quest-drift
+          path: mondstadt-quest-drift.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Focused Amber tutorial regression
         run: python tools/verify_prologue_35301.py
