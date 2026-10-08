@@ -163,3 +163,11 @@ finish/fail content types. The previously absent QUEST_CONTENT_TEAM_DEAD
 handler and full-team death event are included there. This census checks
 handler presence; it does not prove a Lua/client event actually fires.
 New condition types are CI-blocking until reviewed.
+
+## Battle failure combinations
+
+GCResource 3700 and 4000 preserve LOGIC_OR for 37602, 39703 and 38802,
+just as the existing 35203 alternative-death/plot fail condition does.
+These four battle quests can fail on either story-cancel or a full-party
+wipe. The static gate now pins both failure conditions and the OR
+combinator, with a matching scoped server-side failCondComb fallback.

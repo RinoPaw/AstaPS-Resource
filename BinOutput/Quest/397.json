@@ -196,7 +196,8 @@
           ],
           "type": "QUEST_EXEC_REFRESH_GROUP_SUITE"
         }
-      ]
+      ],
+      "failCondComb": "LOGIC_OR"
     },
     {
       "finishCond": [

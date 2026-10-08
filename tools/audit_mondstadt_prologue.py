@@ -87,6 +87,10 @@ REQUIRED_ACCEPT_EDGES = {
     36301: (35202,), 37001: (31101,), 39701: (38406,),
 }
 
+FAIL_COMBINATORS = {
+    35203: "LOGIC_OR", 37602: "LOGIC_OR",
+    39703: "LOGIC_OR", 38802: "LOGIC_OR",
+}
 COMBINATORS = {
     31101: "LOGIC_OR", 35901: "LOGIC_OR",
     30710: "LOGIC_OR", 30810: "LOGIC_OR", 30814: "LOGIC_OR",
@@ -379,6 +383,12 @@ def main():
 
     for sub, logic in COMBINATORS.items():
         require(subs[sub].get("finishCondComb") == logic, "%d must combine finish with %s" % (sub, logic))
+    for sub, logic in FAIL_COMBINATORS.items():
+        require(subs[sub].get("failCondComb") == logic, "%d must combine failure with %s" % (sub, logic))
+        fail_types = [c.get("type") for c in subs[sub].get("failCond", [])]
+        require("QUEST_CONTENT_TEAM_DEAD" in fail_types
+                and "QUEST_CONTENT_NOT_FINISH_PLOT" in fail_types,
+                "%d lost one of its two combat failure paths" % sub)
     require(any(c.get("type") == "QUEST_CONTENT_UNLOCK_TRANS_POINT"
                 and c.get("param") == [3, 6]
                 for c in subs[35106].get("finishCond", [])),
