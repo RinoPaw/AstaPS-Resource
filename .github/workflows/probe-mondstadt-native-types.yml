@@ -1,0 +1,60 @@
+name: Probe Mondstadt native Quest runtime types
+
+on:
+  push:
+    branches:
+      - rino-native-mainline-quests
+    paths:
+      - .github/workflows/probe-mondstadt-native-types.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: List Mondstadt native condition and exec types
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from collections import Counter
+
+          ids = {
+            351,359,363,352,353,355,354,360,356,357,358,306,307,308,309,311,
+            370,371,372,373,374,375,376,377,20101,379,380,381,382,383,384,
+            397,388,389,390,393,394,398,396
+          }
+          data=json.load(open("quests.json",encoding="utf-8"))
+          contents=Counter()
+          execs=Counter()
+          rows=0
+          mains=[]
+          for main in data.get("mainQuests",[]):
+            if main.get("mainId") not in ids:
+              continue
+            mains.append(main["mainId"])
+            for row in main.get("quests",[]):
+              rows += 1
+              for key in ("finishCond","failCond"):
+                for x in row.get(key,[]) or []:
+                  contents[(x.get("typeId"),x.get("type"))]+=1
+              for key in ("finishExec","failExec"):
+                for x in row.get(key,[]) or []:
+                  execs[(x.get("typeId"),x.get("type"))]+=1
+          print("MAINS",len(mains),sorted(mains))
+          print("ROWS",rows)
+          print("CONTENTS")
+          for (i,n),c in sorted(contents.items()):
+            print(i,n,c)
+          print("EXECS")
+          for (i,n),c in sorted(execs.items()):
+            print(i,n,c)
+          PY
