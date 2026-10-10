@@ -35,8 +35,13 @@ def check():
         actual=tuple(map(int,re.findall(r"config_id\s*=\s*(\d+),\s*monster_id",monster_definitions)))
         assert actual == expected,(scene,actual,expected)
         assert re.search(r"monsters\s*=\s*\{\s*\},\s*gadgets\s*=\s*\{\s*9001\s*\}",combat),scene
-        assert re.search(r"config_id\s*=\s*5001,\s*gadget_id\s*=\s*70350008",reward),scene
+        # Match the fully verified 40501 finish fixture rather than a guessed lone tree.
+        assert re.search(r"config_id\\s*=\\s*5001,\\s*gadget_id\\s*=\\s*70340012",reward),scene
+        assert re.search(r"config_id\\s*=\\s*5002,\\s*gadget_id\\s*=\\s*70350008",reward),scene
+        assert "gadgets = {5001, 5002}" in reward, scene
+        assert re.search(r"config_id\\s*=\\s*5001[^\\n]*z\\s*=\\s*-69\\.700",reward),scene
+        assert re.search(r"config_id\\s*=\\s*5002[^\\n]*z\\s*=\\s*-65\\.517",reward),scene
         assert re.search(r"config_id\s*=\s*9001,\s*gadget_id\s*=\s*70360010,\s*pos\s*=\s*\{\s*x\s*=\s*0\.000,\s*y\s*=\s*0\.000,\s*z\s*=\s*0\.000",combat),scene
-        print(f"OK {scene}: key=9001, worktop=70360010, waves={len(actual)}, reward=5001")
+        print(f"OK {scene}: key=9001, worktop=70360010, waves={len(actual)}, reward=5001+5002")
 if __name__=="__main__":
     check()
