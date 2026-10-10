@@ -30,12 +30,13 @@ def check():
         for text,gid in ((combat,combat_group),(reward,reward_group)):
             assert f"group_id = {gid}" in text
             assert "init_config" in text and "suites" in text
-        assert re.search(r"config_id\s*=\s*9001,\s*gadget_id\s*=\s*70350096",combat),scene
+        assert re.search(r"config_id\s*=\s*9001,\s*gadget_id\s*=\s*70360010",combat),scene
         monster_definitions = combat.split("npcs = {}")[0]
         actual=tuple(map(int,re.findall(r"config_id\s*=\s*(\d+),\s*monster_id",monster_definitions)))
         assert actual == expected,(scene,actual,expected)
         assert re.search(r"monsters\s*=\s*\{\s*\},\s*gadgets\s*=\s*\{\s*9001\s*\}",combat),scene
         assert re.search(r"config_id\s*=\s*5001,\s*gadget_id\s*=\s*70350008",reward),scene
-        print(f"OK {scene}: key=9001, waves={len(actual)}, reward=5001")
+        assert re.search(r"config_id\s*=\s*9001,\s*gadget_id\s*=\s*70360010,\s*pos\s*=\s*\{\s*x\s*=\s*0\.000,\s*y\s*=\s*0\.000,\s*z\s*=\s*0\.000",combat),scene
+        print(f"OK {scene}: key=9001, worktop=70360010, waves={len(actual)}, reward=5001")
 if __name__=="__main__":
     check()

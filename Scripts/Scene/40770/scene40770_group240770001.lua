@@ -11,7 +11,7 @@ monsters = {
 }
 npcs = {}
 gadgets = {
-    { config_id = 9001, gadget_id = 70350096, pos = { x = 0.000, y = 0.150, z = 4.000 }, rot = { x = 0.000, y = 180.000, z = 0.000 }, level = 1 }
+    { config_id = 9001, gadget_id = 70360010, pos = { x = 0.000, y = 0.000, z = 0.000 }, rot = { x = 0.000, y = 180.000, z = 0.000 }, level = 1 }
 }
 regions = {}
 triggers = {}

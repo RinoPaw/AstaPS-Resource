@@ -8,7 +8,7 @@ Consequently, entering dungeon 4473 reported missing
 These **synthetic compatibility** scripts provide the minimal block and groups
 expected by AstaPS `MissingDomainFallbackManager` for scenes 40770–40773:
 combat group `24077N001`, reward group `24077N004`, starter key config
-`9001` (gadget 70350096, worktop option 7), and reward config `5001`
+`9001` (gadget 70360010, worktop option 7), and reward config `5001`
 (gadget 70350008). Monster configs correspond to the Java fallback waves.
 These scripts are **not native 7.1 group reconstructions**. Combat monsters,
 their positions and levels are compatibility substitutes.
@@ -21,3 +21,12 @@ Run `python scripts/validate_fontaine_weapon_domains.py` for static checks.
 Deploy only under `resources/Scripts/Scene/{40770..40773}` from this
 resource branch alongside the AstaPS test build. Restart the server so its
 Lua group/block metadata is reloaded.
+
+## Visible challenge-key prefab
+
+The first compatibility pass used gadget 70350096 at (0, 0.15, 4). Server logs
+confirmed entity creation and option 7, but client users reported no visible key
+or monsters. The known-working domain 40501 uses 70360010 at approximately
+(0, 0, 0), so compatibility keys now use the same worktop prefab and location.
+This is a targeted compatibility hypothesis pending client confirmation;
+server-side presence alone is insufficient to prove client visibility.

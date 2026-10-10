@@ -1,5 +1,5 @@
 -- 7.1 compatibility: missing native block. Used with MissingDomainFallbackManager.
 groups = {
-    { id = 240771001, refresh_id = 1001, pos = { x = 0.000, y = 0.000, z = 4.000 } },
+    { id = 240771001, refresh_id = 1001, pos = { x = 0.000, y = 0.000, z = 0.000 } },
     { id = 240771004, refresh_id = 1001, pos = { x = 0.000, y = 0.000, z = -28.000 } }
 }
