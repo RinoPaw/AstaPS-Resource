@@ -42,13 +42,13 @@ def check():
         assert re.search(r"config_id\s*=\s*5002,\s*gadget_id\s*=\s*70350008",reward),scene
         assert "gadgets = {5001, 5002}" in reward, scene
         if scene == 40773:
-            assert re.search(r"config_id\\s*=\\s*5001[^\\n]*z\\s*=\\s*-28\\.000", reward), scene
-            assert re.search(r"config_id\\s*=\\s*5002[^\\n]*z\\s*=\\s*-23\\.817", reward), scene
-            assert re.search(rf"id\\s*=\\s*{reward_group}[^\\n]*z\\s*=\\s*-28\\.000", block), scene
+            assert re.search(r"config_id\s*=\s*5001[^\n]*z\s*=\s*-28\.000", reward), scene
+            assert re.search(r"config_id\s*=\s*5002[^\n]*z\s*=\s*-23\.817", reward), scene
+            assert re.search(rf"id\s*=\s*{reward_group}[^\n]*z\s*=\s*-28\.000", block), scene
             assert "DUNGEON_SETTLE_5003" in reward, scene
         else:
-            assert re.search(r"config_id\\s*=\\s*5001[^\\n]*z\\s*=\\s*-69\\.700",reward),scene
-            assert re.search(r"config_id\\s*=\\s*5002[^\\n]*z\\s*=\\s*-65\\.517",reward),scene
+            assert re.search(r"config_id\s*=\s*5001[^\n]*z\s*=\s*-69\.700",reward),scene
+            assert re.search(r"config_id\s*=\s*5002[^\n]*z\s*=\s*-65\.517",reward),scene
         assert re.search(r"config_id\s*=\s*9001,\s*gadget_id\s*=\s*70360010,\s*pos\s*=\s*\{\s*x\s*=\s*0\.000,\s*y\s*=\s*0\.000,\s*z\s*=\s*0\.000",combat),scene
         print(f"OK {scene}: key=9001, worktop=70360010, waves={len(actual)}, reward=5001+5002")
 if __name__=="__main__":
