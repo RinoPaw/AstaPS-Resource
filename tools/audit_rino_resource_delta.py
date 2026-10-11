@@ -94,6 +94,18 @@ def audit_quests(current_dir: Path, old_dir: Path) -> None:
             "different_samples": samples[(field, "different")],
         }, ensure_ascii=False, separators=(",", ":")))
 
+    for sub_id in both:
+        a, b = current[sub_id], old[sub_id]
+        if a.get("acceptCondComb") == b.get("acceptCondComb"):
+            continue
+        print("QUEST_COMBINER_DETAIL", sub_id, json.dumps({
+            "mainId": a.get("mainId"),
+            "upstream_comb": a.get("acceptCondComb"),
+            "rino_comb": b.get("acceptCondComb"),
+            "upstream_conditions": a.get("acceptCond"),
+            "rino_conditions": b.get("acceptCond"),
+        }, ensure_ascii=False, separators=(",", ":")))
+
     for sub_id in (35301, 35402, 35901, 39403):
         a, b = current.get(sub_id, {}), old.get(sub_id, {})
         for field in ("beginExec", "finishExec", "gainItems"):
