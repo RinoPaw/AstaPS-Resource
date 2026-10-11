@@ -1,0 +1,73 @@
+name: Audit Rino resource divergence
+
+on:
+  push:
+    branches: [audit/rino-resource-reconcile-20261012]
+    paths:
+      - README.md
+      - tools/audit_rino_resource_delta.py
+      - .github/workflows/audit-rino-resource-delta.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout read-only audit script
+        uses: actions/checkout@v4
+        with:
+          ref: audit/rino-resource-reconcile-20261012
+          path: audit
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/audit_rino_resource_delta.py
+
+      - name: Checkout latest fork main (synced to upstream)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: upstream
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+            ExcelBinOutput/MaterialExcelConfigData.json
+
+      - name: Checkout original play/rino
+        uses: actions/checkout@v4
+        with:
+          ref: play/rino
+          path: rino
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+            ExcelBinOutput/MaterialExcelConfigData.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Static syntax check and full 33k-row audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile audit/tools/audit_rino_resource_delta.py
+          python audit/tools/audit_rino_resource_delta.py upstream rino | tee rino-resource-audit.log
+          grep -q '^QUESTEXCEL_POPULATION' rino-resource-audit.log
+          grep -q '^QUESTEXCEL_CHANGE_CLASSES' rino-resource-audit.log
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rino-resource-questexcel-audit
+          path: rino-resource-audit.log
+          if-no-files-found: ignore
