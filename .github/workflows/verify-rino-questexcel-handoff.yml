@@ -34,7 +34,7 @@ jobs:
             ExcelBinOutput/QuestExcelConfigData.json
       - uses: actions/checkout@v4
         with:
-          ref: 45ccd17ea546b0a9d19da36a12c6086580481bb7
+          ref: 0850e6250a6b141d4afe7a9bb91bf50c27f812ea
           path: candidate
           persist-credentials: false
           filter: blob:none
