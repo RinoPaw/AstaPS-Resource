@@ -1,0 +1,118 @@
+name: Verify Rino quest prerequisites handoff
+
+on:
+  push:
+    branches: [audit/rino-resource-reconcile-20261012]
+    paths:
+      - tools/verify_rino_questexcel_handoff.py
+      - .github/workflows/verify-rino-questexcel-handoff.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: audit
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/verify_rino_questexcel_handoff.py
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: upstream
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+      - uses: actions/checkout@v4
+        with:
+          ref: 45ccd17ea546b0a9d19da36a12c6086580481bb7
+          path: candidate
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+      - uses: actions/checkout@v4
+        with:
+          ref: play/rino
+          path: rino
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ExcelBinOutput/QuestExcelConfigData.json
+      - uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: '3700'
+          path: ref3700
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/1008.json
+            BinOutput/Quest/1011.json
+            BinOutput/Quest/1013.json
+            BinOutput/Quest/1016.json
+            BinOutput/Quest/1018.json
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1021.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/2000.json
+            BinOutput/Quest/2004.json
+            BinOutput/Quest/2008.json
+            BinOutput/Quest/2009.json
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8005.json
+            BinOutput/Quest/8006.json
+      - uses: actions/checkout@v4
+        with:
+          repository: TomyJan/GCResource
+          ref: '4000'
+          path: ref4000
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            BinOutput/Quest/1008.json
+            BinOutput/Quest/1011.json
+            BinOutput/Quest/1013.json
+            BinOutput/Quest/1016.json
+            BinOutput/Quest/1018.json
+            BinOutput/Quest/1019.json
+            BinOutput/Quest/1021.json
+            BinOutput/Quest/1029.json
+            BinOutput/Quest/1030.json
+            BinOutput/Quest/2000.json
+            BinOutput/Quest/2004.json
+            BinOutput/Quest/2008.json
+            BinOutput/Quest/2009.json
+            BinOutput/Quest/8000.json
+            BinOutput/Quest/8005.json
+            BinOutput/Quest/8006.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify 33,217 rows and historical prerequisite evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile audit/tools/verify_rino_questexcel_handoff.py
+          python audit/tools/verify_rino_questexcel_handoff.py upstream candidate rino ref3700 ref4000 | tee handoff.log
+          grep -q '^PASS read-only QuestExcel validation' handoff.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: questexcel-handoff-evidence
+          path: handoff.log
+          if-no-files-found: ignore
