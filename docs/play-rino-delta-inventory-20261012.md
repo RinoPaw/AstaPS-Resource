@@ -42,7 +42,7 @@ The archived `.gitignore` and archive-oriented `README.md` are branch metadata, 
 - `fix/questexcel-verified-prereqs-71`: a subset of the merged PR #17; no new production patch needed.
 - `audit/rino-questexcel-mainline-71`: older README-only audit branch; upstream README already describes the ownership boundary without its stale link.
 - `audit/rino-resource-reconcile-20261012`: holds **unique, read-only** comparison/verification tools and associated successful Action runs. Preserve it until these audit scripts are explicitly archived or judged unnecessary.
-- `integrate/mondstadt-prologue-71`: retains unreconciled compatibility experiments (weather, seal, 39403), so do not delete it just because this archive was cleaned.
-- `fix/mondstadt-71-rino-compat` and `rino-native-mainline-quests`: separate experiments; the latter removed whole `BinOutput/Quest` and is not production-ready.
+- `integrate/mondstadt-prologue-71` and `fix/mondstadt-71-rino-compat`: historical compatibility research now [archived with source/tool SHA evidence in Genshin-Reverse](https://github.com/RinoPaw/Genshin-Reverse/tree/628f958aab4a7df9a8ded032e58911225edafad7/versions/7.1.0-global/analyses/quest-prerequisites/mondstadt-prologue). Both are eligible for branch retirement after confirming their exact remote heads; neither has a remaining proven upstream production fix. The older compat branch retains stale `38201` and `39807` OR combinators and the discarded `38402` rollback.
+- `rino-native-mainline-quests`: separate experiment that removed whole `BinOutput/Quest`; not production-ready.
 
 This inventory is a Git data/field comparison, **not** a bug list or a recommendation to restore historic conditions. Require a narrowly scoped reproduction, safe checks and CI before proposing a resource patch upstream.
