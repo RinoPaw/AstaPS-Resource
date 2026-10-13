@@ -260,3 +260,27 @@ report = {"resource_source": "MeChen618/AstaPS-Resource@85b81a69",
           "top_problem_roots": [[list(k),v] for k,v in problem_roots.most_common(100)],
           "samples": dict(failures)}
 Path("chest-coverage-report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+
+# Root-level and immediate-child diagnostics for common partial and empty outcomes.
+for root in (1000100, 52040000, 52030000, 52020500, 51040000, 51010000, 51010500):
+    row = table.get(root)
+    if row is None:
+        continue
+    vec = drop_vec(row)
+    print("ROOT_PROBE", root, "status", structural(root), "vec", len(vec),
+          "randomType", row.get("randomType"), "nodeType", row.get("nodeType"),
+          "first_entries", json.dumps(vec[:8],ensure_ascii=False))
+    children = [int(e.get("itemId",0)) for e in vec if isinstance(e,dict)
+                and int(e.get("itemId") or 0) in table]
+    for child in children[:3]:
+        childrow = table[child]
+        print("  CHILD", child, "status", structural(child),
+              "count", len(drop_vec(childrow)), "items",
+              json.dumps(drop_vec(childrow)[:6],ensure_ascii=False))
+# Break down omissions by source and by scene, including the original one-off policy.
+for scope, rows in (("all",records),("scene3",[r for r in records if r["scene"] == "3"]),
+                    ("oneoff",[r for r in records if r["oneoff"]])):
+    statuses = collections.Counter(resolve(r)[2] for r in rows)
+    sources = collections.Counter(resolve(r)[0] for r in rows)
+    print("SCOPE",scope,"n",len(rows),"source",json.dumps(sources),
+          "status",json.dumps(statuses))
