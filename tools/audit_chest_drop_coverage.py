@@ -199,8 +199,8 @@ for file in SCENES.rglob("*.lua"):
                "id": val(fragment, "chest_drop_id"),
                "tag": tag, "level": val(fragment, "level"),
                "drop_count": val(fragment, "drop_count"),
-               "oneoff": bool(re.search(r"\\bisOneoff\\s*=\\s*true\\b", fragment)),
-               "persistent": bool(re.search(r"\\bpersistent\\s*=\\s*true\\b",fragment))}
+               "oneoff": bool(re.search(r"\bisOneoff\s*=\s*true\b", fragment)),
+               "persistent": bool(re.search(r"\bpersistent\s*=\s*true\b",fragment))}
         records.append(rec)
 
 totals["ordinary_chests"] = len(records)
