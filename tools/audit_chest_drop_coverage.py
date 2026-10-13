@@ -199,7 +199,8 @@ for file in SCENES.rglob("*.lua"):
                "id": val(fragment, "chest_drop_id"),
                "tag": tag, "level": val(fragment, "level"),
                "drop_count": val(fragment, "drop_count"),
-               "oneoff": "isOneoff = true" in fragment}
+               "oneoff": bool(re.search(r"\\bisOneoff\\s*=\\s*true\\b", fragment)),
+               "persistent": bool(re.search(r"\\bpersistent\\s*=\\s*true\\b",fragment))}
         records.append(rec)
 
 totals["ordinary_chests"] = len(records)
@@ -284,3 +285,58 @@ for scope, rows in (("all",records),("scene3",[r for r in records if r["scene"] 
     sources = collections.Counter(resolve(r)[0] for r in rows)
     print("SCOPE",scope,"n",len(rows),"source",json.dumps(sources),
           "status",json.dumps(statuses))
+
+def min_count_at_least_one(value):
+    if value is None:
+        return False
+    try:
+        s = str(value).split(";")[0]
+        return float(s) >= 1
+    except (TypeError, ValueError):
+        return False
+def has_guaranteed_leaf(root, active=None):
+    if root not in table:
+        return False
+    if active is None:
+        active = set()
+    if root in active or len(active) > 80:
+        return False
+    row = table[root]
+    vec = [e for e in drop_vec(row) if isinstance(e, dict)
+           and int(e.get("weight") or 0) > 0 and int(e.get("itemId") or 0) > 0]
+    if not vec:
+        return False
+    active.add(root)
+    def always(item):
+        child_id = int(item.get("itemId"))
+        if not min_count_at_least_one(item.get("countRange")):
+            return False
+        if child_id in table:
+            return has_guaranteed_leaf(child_id, active)
+        return True
+    if row.get("randomType") == 1:
+        result = any(int(e.get("weight") or 0) >= 10000 and always(e) for e in vec)
+    elif row.get("randomType") == 0:
+        result = all(always(e) for e in vec)
+    else:
+        result = False
+    active.remove(root)
+    return result
+
+for scope, rows in (("scene_all",records),
+                    ("isOneoff_true",[r for r in records if r["oneoff"]]),
+                    ("persistent_true",[r for r in records if r["persistent"]]),
+                    ("both_flags_false",[r for r in records if not r["oneoff"] and not r["persistent"]]),
+                    ("scene3_oneoff",[r for r in records if r["scene"] == "3" and r["oneoff"]])):
+    summary=collections.Counter()
+    for rec in rows:
+        source,root,status = resolve(rec)
+        summary["total"] += 1
+        summary["metadata"] += source != "none"
+        summary["structural_ok"] += status == "ok"
+        summary["structural_partial"] += status == "partial"
+        summary["guaranteed_native_leaf"] += (root > 0 and has_guaranteed_leaf(root))
+        summary["no_metadata"] += status == "no-metadata"
+        summary["missing_root"] += status == "missing"
+        summary["empty_root"] += status == "empty"
+    print("GUARANTEE_SCOPE",scope,json.dumps(summary))
