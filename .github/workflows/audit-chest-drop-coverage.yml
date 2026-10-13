@@ -1,0 +1,46 @@
+name: Audit native chest drop coverage
+on:
+  push:
+    branches:
+      - audit/chest-native-coverage-71
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout scene scripts and native tables
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            Scripts/Scene
+            ExcelBinOutput/GadgetExcelConfigData.json
+            Server/DropTableExcelConfigData.json
+            Server/DropSubTableExcelConfigData.json
+            tools/audit_chest_drop_coverage.py
+      - name: Checkout server chest metadata
+        uses: actions/checkout@v4
+        with:
+          repository: MeChen618/AstaPS
+          ref: dcf04369a356486a07be976b244b83d7208c3992
+          path: upstream-server
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            data/ChestDrop.json
+            data/nodkrai_explore_points.json
+            data/snezhnaya_explore_points.json
+            data/region_explore_points.json
+      - name: Analyze all authored chests
+        run: python3 tools/audit_chest_drop_coverage.py
+      - name: Publish detailed coverage results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chest-coverage-report
+          path: chest-coverage-report.json
+          if-no-files-found: ignore
