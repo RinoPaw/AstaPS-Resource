@@ -104,7 +104,15 @@ def run():
                 area_id=int(aid.group(1)) if aid else None
                 # The 100-103 CityConfigData entries are reused by the Golden
                 # Apple Archipelago (scene 4), and are NOT mainland Liyue.
-                region="群岛" if scene==4 else by_area.get(area_id)
+                # CityConfigData reuses mainland city entries for special maps.
+                # Enkanomiya (scene 7, area 210) belongs to Inazuma;
+                # archipelago scenes 4/9 are not mainland Liyue.
+                if scene==7 and area_id==210:
+                    region="稻妻"
+                elif scene==4 or (scene==9 and area_id in (400,401,402,403)):
+                    region="群岛"
+                else:
+                    region=by_area.get(area_id)
                 original_region=region
                 geo_area=None
                 if scene in (1,3) and pos:
@@ -116,15 +124,15 @@ def run():
                 geo_region=by_area.get(geo_area)
                 if not original_region and geo_region:
                     region=geo_region
-                    resolved_missing[(scene,region)]+=1
-                if scene==3 and area_id:
+                    if ordinary:resolved_missing[(scene,region)]+=1
+                if ordinary and scene==3 and area_id:
                     if geo_area==area_id:geom_checks["source_area_id_exact"]+=1
                     elif geo_area is None:geom_checks["source_area_id_outside_polygon"]+=1
                     elif by_area.get(geo_area)==by_area.get(area_id):
                         geom_checks["source_area_id_diff_same_country"]+=1
                     else:
                         geom_checks["source_area_id_country_conflict"]+=1
-                if scene==1 and geo_area:geom_checks["scene1_shared_coordinates_matched"]+=1
+                if ordinary and scene==1 and geo_area:geom_checks["scene1_shared_coordinates_matched"]+=1
                 tag_txt=tag.group(1) if tag else ""
                 label=suffix(tag_txt)
                 row={
