@@ -5,6 +5,7 @@ on:
       - audit/chest-region-tags-71
     paths:
       - tools/audit_chest_region_tags.py
+      - tools/audit_chest_lua_regions.py
       - .github/workflows/audit-chest-region-tags.yml
 permissions:
   contents: read
@@ -16,10 +17,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            ScriptSceneData/flat.luas.scenes.full_globals.lua.json
+            Scripts/Scene/1
+            Scripts/Scene/3
+            Scripts/Scene/4
+            Scripts/Scene/5
+            Scripts/Scene/6
+            Scripts/Scene/7
+            Scripts/Scene/9
+            Scripts/Scene/10
+            Scripts/Scene/11
             ExcelBinOutput/CityConfigData.json
             ExcelBinOutput/GadgetExcelConfigData.json
-            tools/audit_chest_region_tags.py
+            tools/audit_chest_lua_regions.py
           sparse-checkout-cone-mode: false
-      - name: Audit regions (read only)
-        run: python tools/audit_chest_region_tags.py
+      - name: Cross-check all open-world scene groups
+        run: python tools/audit_chest_lua_regions.py
+      - name: Save detailed audit CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: chest-area-tag-audit-71
+          path: audit-results/
+          retention-days: 30
