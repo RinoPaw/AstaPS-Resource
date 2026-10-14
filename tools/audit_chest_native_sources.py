@@ -118,7 +118,75 @@ def run():
                          "combatRoot":a,"puzzleRoot":b,
                          "sameGraph":f1==f2 and f1 is not None,
                          "combatKnown":f1 is not None,"puzzleKnown":f2 is not None})
+    # Measure the actual 7.1 tables, rather than assuming every tagged pool is complete.
+    native_roots={entry["root"] for entry in roots}
+    root_nodes=set()
+    terminal_ids=set()
+    root_with_empty_vec=set()
+    random_types=collections.Counter()
+    count_examples=collections.Counter()
+    node_types=collections.Counter()
+    def traverse(node_id,visited):
+        if node_id in visited or node_id not in tabs:return
+        visited.add(node_id)
+        root_nodes.add(node_id)
+        row=tabs[node_id]
+        node_types[row.get("nodeType",0)]+=1
+        random_types[row.get("randomType",0)]+=1
+        for v in row.get("dropVec",[]) or []:
+            if not isinstance(v.get("itemId"),int):continue
+            child=v["itemId"]
+            count_examples[str(v.get("countRange"))]+=1
+            if child in tabs:traverse(child,visited)
+            elif child>0:terminal_ids.add(child)
+    for root in native_roots:
+        if root in tabs and not tabs[root].get("dropVec"):root_with_empty_vec.add(root)
+        traverse(root,set())
+    candidate_families=collections.Counter()
+    for node_id in tabs:
+        if 50000000<=node_id<55000000:
+            candidate_families[str(node_id//1000000)]+=1
+    # Show small source-authored rows: inspect differences before calling them
+    # distinct item probabilities, which requires executing their nested graphs.
+    chosen_tags=["战斗低级蒙德","解谜低级蒙德","战斗中级蒙德",
+                 "解谜中级蒙德","战斗低级璃月","解谜低级璃月",
+                 "战斗低级稻妻","解谜低级稻妻",
+                 "战斗低级须弥","解谜低级须弥"]
+    first_source={}
+    for src in roots:
+        if src["tag"] in chosen_tags and (src["tag"] not in first_source or
+                                          src["level"]<first_source[src["tag"]]["level"]):
+            first_source[src["tag"]]=src
+    native_samples=[]
+    for tag,source in sorted(first_source.items()):
+        table=tabs.get(source["root"])
+        native_samples.append({"tag":tag,**source,"randomType":table.get("randomType"),
+            "nodeType":table.get("nodeType"),"dropVec":table.get("dropVec",[])[:40],
+            "dropVecCount":len(table.get("dropVec",[]))} if table else {"tag":tag,**source,"missing":True})
+    explicit_id_count=sum(sum(counter.values()) for counter in drop_ids.values())
+    explicit_id_present=sum(n for counter in drop_ids.values() for id_,n in counter.items()
+                            if id_ in tabs)
+    explicit_id_nonempty=sum(n for counter in drop_ids.values() for id_,n in counter.items()
+                             if id_ in tabs and tabs[id_].get("dropVec"))
+    native_graph_summary={
+        "fileRows":{"DropTable":13823,"DropSubTable":1885},
+        "taggedSourceEntries":len(roots),"uniqueTaggedRoots":len(native_roots),
+        "rootRowsPresent":sum(root in tabs for root in native_roots),
+        "emptyRootRows":len(root_with_empty_vec),
+        "reachableTableNodes":len(root_nodes),"reachableTerminalIds":len(terminal_ids),
+        "terminalIdExamples":sorted(terminal_ids)[:80],
+        "randomTypes":dict(random_types),
+        "nodeTypes":dict(node_types),
+        "countRangeMostCommon":count_examples.most_common(20),
+        "candidate51to54millionFamilies":dict(candidate_families),
+        "explicitSourceTotal":explicit_id_count,
+        "explicitSourceIdPresent":explicit_id_present,
+        "explicitSourceIdWithNonemptyTable":explicit_id_nonempty,
+        "examples":native_samples,
+        "warning":"DropTable is server resource, not proven current-client native reward roll. IDs matching family pattern alone do not establish scene linkage."
+    }
     results={
+        "nativeGraphSummary":native_graph_summary,
         "sourceCounts":[{"region":r,"tag":t,"source":s,"count":count} for (r,t,s),count in sorted(rows.items())],
         "pairedRoots":compared,
         "pairStats":{"total":len(compared),"same":sum(x["sameGraph"] for x in compared),
