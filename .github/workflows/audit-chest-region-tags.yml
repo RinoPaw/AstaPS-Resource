@@ -26,6 +26,7 @@ jobs:
             Scripts/Scene/9
             Scripts/Scene/10
             Scripts/Scene/11
+            BinOutput/Scene/WorldArea/scene3_worldArea.json
             ExcelBinOutput/CityConfigData.json
             ExcelBinOutput/GadgetExcelConfigData.json
             tools/audit_chest_lua_regions.py

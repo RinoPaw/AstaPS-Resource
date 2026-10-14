@@ -23,6 +23,35 @@ AREA=re.compile(r"\barea_id\s*=\s*(\d+)")
 TAG=re.compile(r'\bdrop_tag\s*=\s*["\x27]([^"\x27]+)["\x27]')
 POS=re.compile(r'\bpos\s*=\s*\{[^}]*\bx\s*=\s*([-\d.]+)[^}]*\by\s*=\s*([-\d.]+)[^}]*\bz\s*=\s*([-\d.]+)')
 ROOT=BASE/"audit-results"
+POLYGONS=BASE/"BinOutput/Scene/WorldArea/scene3_worldArea.json"
+
+def load_polygons():
+    content=json.loads(POLYGONS.read_text(encoding="utf-8"))
+    output=[]
+    for entry in content["OBKNAJCIHEA"]:
+        area=entry.get("LKBLPFHOAFB") or {}
+        area_id=area.get("BBLLBIOLMHP")
+        points=(area.get("JLFEAGHGCLP") or {}).get("BFLLDPOAJGD") or []
+        pts=[(p["_x"],p["_z"]) for p in points if "_x" in p and "_z" in p]
+        if not area_id or len(pts)<3:continue
+        xs,zs=zip(*pts)
+        output.append((area_id,(min(xs),max(xs),min(zs),max(zs)),pts))
+    if not output:raise RuntimeError("Native scene3 WorldArea polygons unavailable")
+    return output
+
+def polygon_area(x,z,polygons):
+    for aid,(xmin,xmax,zmin,zmax),pts in polygons:
+        if x<xmin or x>xmax or z<zmin or z>zmax:continue
+        inside=False
+        j=len(pts)-1
+        for i,(ax,az) in enumerate(pts):
+            bx,bz=pts[j]
+            if (az>z)!=(bz>z) and x<(bx-ax)*(z-az)/(bz-az)+ax:
+                inside=not inside
+            j=i
+        if inside:return aid
+    return None
+
 
 def norm(name):
     return "挪德卡莱" if name=="诺德克莱" else name
@@ -39,6 +68,8 @@ def run():
         if name:
             for area in entry.get("areaIdVec",[]):
                 by_area[area]=name
+    polygons=load_polygons()
+    print("WORLD_POLYGONS",len(polygons),flush=True)
     gadget_rows=json.loads((BASE/"ExcelBinOutput/GadgetExcelConfigData.json").read_text())
     gadgets={row["id"]:row for row in gadget_rows if "id" in row}
     stat=collections.Counter()
@@ -47,6 +78,8 @@ def run():
     areas=collections.Counter()
     by_scene=collections.Counter()
     special=collections.Counter()
+    geom_checks=collections.Counter()
+    resolved_missing=collections.Counter()
     samples=collections.defaultdict(list)
     results=[]
     def sample(key,row):
@@ -72,6 +105,26 @@ def run():
                 # The 100-103 CityConfigData entries are reused by the Golden
                 # Apple Archipelago (scene 4), and are NOT mainland Liyue.
                 region="群岛" if scene==4 else by_area.get(area_id)
+                original_region=region
+                geo_area=None
+                if scene in (1,3) and pos:
+                    try:
+                        xx,yy,zz=[float(v) for v in pos.groups()]
+                        geo_area=polygon_area(xx,zz,polygons)
+                    except (TypeError, ValueError):
+                        pass
+                geo_region=by_area.get(geo_area)
+                if not original_region and geo_region:
+                    region=geo_region
+                    resolved_missing[(scene,region)]+=1
+                if scene==3 and area_id:
+                    if geo_area==area_id:geom_checks["source_area_id_exact"]+=1
+                    elif geo_area is None:geom_checks["source_area_id_outside_polygon"]+=1
+                    elif by_area.get(geo_area)==by_area.get(area_id):
+                        geom_checks["source_area_id_diff_same_country"]+=1
+                    else:
+                        geom_checks["source_area_id_country_conflict"]+=1
+                if scene==1 and geo_area:geom_checks["scene1_shared_coordinates_matched"]+=1
                 tag_txt=tag.group(1) if tag else ""
                 label=suffix(tag_txt)
                 row={
@@ -80,6 +133,12 @@ def run():
                     "area_id":area_id,"areaRegion":region or "",
                     "tag":tag_txt,"tagRegion":label or "",
                     "pos":",".join(pos.groups()) if pos else "",
+                    "geometry_area_id":geo_area or "",
+                    "geometry_region":geo_region or "",
+                    "area_source":("area_id" if original_region else
+                                   "world_polygon" if scene==3 and region else
+                                   "scene1_shared_coordinates" if scene==1 and region else
+                                   "missing"),
                     "ordinary":ordinary
                 }
                 results.append(row)
@@ -110,10 +169,17 @@ def run():
         w.writerows(x for x in results if x["ordinary"] and x["areaRegion"]!=x["tagRegion"])
     summary={
         "stats":dict(stat),"byScene":dict(by_scene),"byArea":dict(areas),"byTag":dict(tags),
+        "polygons":len(polygons),"geometryValidation":dict(geom_checks),
+        "resolvedMissingByGeometry":[{"scene":s,"region":reg,"count":n}
+            for (s,reg),n in sorted(resolved_missing.items())],
+        "stillUnknown":areas.get("UNKNOWN_AREA",0),
         "pairs":[{"area":a,"tag":t,"count":n} for (a,t),n in sorted(pairs.items())],
         "snowMountain":[{"area":a,"tag":t,"count":n} for (a,t),n in sorted(special.items())],
         "examples":dict(samples),"csvRows":len(results),
-        "method":"Scripts/Scene scene*_group*.lua gadget_id -> GadgetExcel prefab; independent CityConfig.areaIdVec + scene 4=archipelago"
+        "method":"Scripts/Scene gadgets + CityConfig.areaIdVec + scene3 WorldArea polygons for missing area_id; scene1 shares geographic coordinates",
+        "limitations":["Scene 1 has no dedicated WorldArea; geography inferred using scene 3 polygons.",
+                       "Polygon area and script area are independently compared; mismatches are reported.",
+                       "A chest-looking prefab with no tag is not proof of an ordinary reward pool."]
     }
     (ROOT/"summary.json").write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding="utf-8")
     print("SCENE_AUDIT_JSON_BEGIN",flush=True)
