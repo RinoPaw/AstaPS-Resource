@@ -161,7 +161,8 @@ def run():
     ROOT.mkdir(exist_ok=True)
     with (ROOT/"all-chests.csv").open("w",newline="",encoding="utf-8-sig") as fp:
         fields=["scene","path","config","gid","prefab","chestType","area_id",
-                "areaRegion","tag","tagRegion","pos","ordinary"]
+                "areaRegion","tag","tagRegion","pos","geometry_area_id",
+                "geometry_region","area_source","ordinary"]
         w=csv.DictWriter(fp,fieldnames=fields)
         w.writeheader();w.writerows(results)
     with (ROOT/"exceptions.csv").open("w",newline="",encoding="utf-8-sig") as fp:
