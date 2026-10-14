@@ -1,0 +1,42 @@
+name: Chest native source and pool parity audit
+on:
+  push:
+    branches:
+      - audit/chest-region-tags-71
+    paths:
+      - tools/audit_chest_native_sources.py
+      - tools/chest_native_roots_71.json
+      - .github/workflows/audit-chest-native-sources.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            Scripts/Scene/1
+            Scripts/Scene/3
+            Scripts/Scene/4
+            Scripts/Scene/5
+            Scripts/Scene/6
+            Scripts/Scene/7
+            Scripts/Scene/9
+            Scripts/Scene/10
+            Scripts/Scene/11
+            ExcelBinOutput/CityConfigData.json
+            ExcelBinOutput/GadgetExcelConfigData.json
+            Server/DropTableExcelConfigData.json
+            Server/DropSubTableExcelConfigData.json
+            tools/audit_chest_native_sources.py
+            tools/chest_native_roots_71.json
+          sparse-checkout-cone-mode: false
+      - name: Compare raw and explicit chest drop sources
+        run: python tools/audit_chest_native_sources.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chest-native-source-report-71
+          path: audit-results/chest-native-source-audit.json
+          retention-days: 30

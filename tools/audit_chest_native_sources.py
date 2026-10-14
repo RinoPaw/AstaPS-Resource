@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Research only: native chest drop ID coverage and battle/puzzle graph parity.
+
+No guessed tag/category assignments; reads as-authored scene gadget metadata
+and loaded server resource tables. No game server code is modified.
+"""
+import collections
+import hashlib
+import json
+import re
+from pathlib import Path
+
+BASE=Path(__file__).resolve().parents[1]
+SCENES=(1,3,4,5,6,7,9,10,11)
+GADGET=re.compile(r"\bgadget_id\s*=\s*(\d+)")
+TAG=re.compile(r'\bdrop_tag\s*=\s*["\x27]([^"\x27]+)["\x27]')
+CHEST_DROP=re.compile(r"\bchest_drop_id\s*=\s*(\d+)")
+DROP=re.compile(r"\bdrop_id\s*=\s*(\d+)")
+LEVEL=re.compile(r"\blevel\s*=\s*(\d+)")
+AID=re.compile(r"\barea_id\s*=\s*(\d+)")
+PREFAB=re.compile(r"^SceneObj_Chest_(?:(?:Default|Locked|Bramble|Frozen)_Lv[1245](?:_(?:UnderWater|AboveWater|Amphibious|V70|RemusLanternFish|FollowMove))?|Rock_Lv1)$")
+TAG_PARTS=re.compile(r"^(雪山)?(解谜|战斗)(低级|中级|高级|超级)(.*)$")
+NAMES={1:"蒙德",2:"璃月",3:"稻妻",4:"须弥",5:"枫丹",6:"纳塔",7:"挪德卡莱",8:"至冬",9:"至冬",99:"璃月",100:"璃月",101:"璃月",102:"璃月",103:"璃月",104:"璃月"}
+def get_int(regex,line):
+    match=regex.search(line)
+    return int(match.group(1)) if match else 0
+def run():
+    city=json.loads((BASE/"ExcelBinOutput/CityConfigData.json").read_text())
+    area_region={a:NAMES[row["cityId"]] for row in city if row.get("cityId") in NAMES for a in row.get("areaIdVec",[])}
+    gadgets={g["id"]:g for g in json.loads((BASE/"ExcelBinOutput/GadgetExcelConfigData.json").read_text()) if "id" in g}
+    rows=collections.Counter()
+    examples=collections.defaultdict(list)
+    roots_by_region=collections.defaultdict(collections.Counter)
+    drop_ids=collections.defaultdict(collections.Counter)
+    for scene in SCENES:
+        for file in (BASE/f"Scripts/Scene/{scene}").glob(f"scene{scene}_group*.lua"):
+            for line in file.read_text(encoding="utf-8",errors="replace").splitlines():
+                if "gadget_id" not in line:continue
+                gid=get_int(GADGET,line)
+                kind=gadgets.get(gid,{}).get("jsonName","")
+                if not PREFAB.fullmatch(kind):continue
+                tag_match=TAG.search(line)
+                tag=tag_match.group(1) if tag_match else ""
+                chest_id=get_int(CHEST_DROP,line)
+                other_id=get_int(DROP,line)
+                area=get_int(AID,line)
+                region=("群岛" if scene in (4,9) else "稻妻" if scene==7 and area==210
+                        else area_region.get(area) or "missing_area_id")
+                if chest_id not in (0,1000100):
+                    source="explicit_chest_id"
+                elif other_id not in (0,1000100):
+                    source="explicit_drop_id"
+                elif chest_id==1000100 or other_id==1000100:
+                    source="empty_sentinel"
+                else:
+                    source="no_drop_id"
+                tag_state="tag" if tag else "no_tag"
+                rows[(region,tag_state,source)]+=1
+                if tag:roots_by_region[region]["tagged"]+=1
+                if not tag:roots_by_region[region]["untagged"]+=1
+                if source.startswith("explicit"):drop_ids[region][chest_id or other_id]+=1
+                if len(examples[(region,tag_state,source)])<4:
+                    examples[(region,tag_state,source)].append(
+                        {"scene":scene,"path":str(file.relative_to(BASE)),
+                         "config":get_int(re.compile(r"\bconfig_id\s*=\s*(\d+)"),line),
+                         "gadget":gid,"prefab":kind,"level":get_int(LEVEL,line),
+                         "area_id":area,"tag":tag,"chest_drop_id":chest_id,"drop_id":other_id})
+    print("NATIVE_CHEST_SOURCE_COUNTS", json.dumps(
+        [{"region":r,"tag":t,"source":s,"count":count} for (r,t,s),count in sorted(rows.items())],
+        ensure_ascii=False), flush=True)
+
+    tabs={}
+    dup=collections.Counter()
+    for name in ("DropTableExcelConfigData.json","DropSubTableExcelConfigData.json"):
+        entries=json.loads((BASE/"Server"/name).read_text())
+        print("NATIVE_TABLE_FORMAT",name,{"records":len(entries),"sample":entries[:2]},flush=True)
+        for item in entries:
+            key=item.get("id")
+            if not isinstance(key,int):continue
+            if key in tabs:
+                dup[key]+=1
+            tabs[key]=item
+    missing=set()
+    mem={}
+    cycles=set()
+    def digest(id_,stack=()):
+        if id_ in mem:return mem[id_]
+        if id_ in stack:
+            cycles.add(id_);return f"CYCLE:{id_}"
+        entry=tabs.get(id_)
+        if entry is None:
+            missing.add(id_);return None
+        edges=[]
+        for drop in entry.get("dropVec",[]) or []:
+            item_id=drop.get("itemId")
+            if not isinstance(item_id,int) or item_id==0:continue
+            value=digest(item_id,stack+(id_,)) if item_id in tabs else None
+            edges.append([value if value is not None else ["item",item_id],
+                          drop.get("countRange"),drop.get("weight")])
+        key=json.dumps([entry.get("randomType",0),entry.get("fallToGround",False),edges],
+                       ensure_ascii=False,separators=(",",":"))
+        fingerprint=hashlib.sha256(key.encode("utf-8")).hexdigest()
+        mem[id_]=fingerprint
+        return fingerprint
+    roots=json.loads((BASE/"tools/chest_native_roots_71.json").read_text())
+    groups=collections.defaultdict(dict)
+    for s in roots:
+        m=TAG_PARTS.match(s["tag"])
+        if not m:continue
+        key=(bool(m.group(1)),m.group(3),m.group(4),s["level"])
+        groups[key][m.group(2)]=s["root"]
+    compared=[]
+    for key,nodes in sorted(groups.items()):
+        if "战斗" not in nodes or "解谜" not in nodes:continue
+        a,b=nodes["战斗"],nodes["解谜"]
+        f1,f2=digest(a),digest(b)
+        compared.append({"snow":key[0],"quality":key[1],"region":key[2],"level":key[3],
+                         "combatRoot":a,"puzzleRoot":b,
+                         "sameGraph":f1==f2 and f1 is not None,
+                         "combatKnown":f1 is not None,"puzzleKnown":f2 is not None})
+    results={
+        "sourceCounts":[{"region":r,"tag":t,"source":s,"count":count} for (r,t,s),count in sorted(rows.items())],
+        "pairedRoots":compared,
+        "pairStats":{"total":len(compared),"same":sum(x["sameGraph"] for x in compared),
+                     "different":sum(not x["sameGraph"] for x in compared)},
+        "rootsMissing":sorted(missing)[:80],"nodeCycles":sorted(cycles)[:30],
+        "duplicateTableIds":len(dup),
+        "regionRootCoverage":{k:dict(v) for k,v in roots_by_region.items()},
+        "examples":[{"region":r,"tag":t,"source":s,"items":samples}
+                    for (r,t,s),samples in sorted(examples.items())],
+        "explicitDropIdTop":{k:v.most_common(15) for k,v in drop_ids.items()},
+    }
+    (BASE/"audit-results").mkdir(exist_ok=True)
+    (BASE/"audit-results/chest-native-source-audit.json").write_text(
+        json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8")
+    print("NATIVE_SOURCE_AUDIT_JSON_BEGIN",flush=True)
+    print(json.dumps(results,ensure_ascii=False,separators=(",",":")),flush=True)
+    print("NATIVE_SOURCE_AUDIT_JSON_END",flush=True)
+if __name__=="__main__":
+    run()
