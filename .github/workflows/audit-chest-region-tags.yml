@@ -1,0 +1,25 @@
+name: One-time chest region tag audit
+on:
+  push:
+    branches:
+      - audit/chest-region-tags-71
+    paths:
+      - tools/audit_chest_region_tags.py
+      - .github/workflows/audit-chest-region-tags.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ScriptSceneData/flat.luas.scenes.full_globals.lua.json
+            ExcelBinOutput/CityConfigData.json
+            ExcelBinOutput/GadgetExcelConfigData.json
+            tools/audit_chest_region_tags.py
+          sparse-checkout-cone-mode: false
+      - name: Audit regions (read only)
+        run: python tools/audit_chest_region_tags.py
