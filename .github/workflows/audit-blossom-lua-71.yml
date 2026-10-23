@@ -1,0 +1,26 @@
+name: Audit 7.1 blossom Lua coverage tool
+
+on:
+  push:
+    paths:
+      - 'scripts/audit_blossom_lua_71.py'
+      - 'scripts/test_audit_blossom_lua_71.py'
+      - '.github/workflows/audit-blossom-lua-71.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/audit_blossom_lua_71.py
+            scripts/test_audit_blossom_lua_71.py
+          sparse-checkout-cone-mode: false
+      - name: Test source-coverage classification
+        run: python3 -m unittest discover -s scripts -p test_audit_blossom_lua_71.py
