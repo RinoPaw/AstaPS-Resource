@@ -1,0 +1,32 @@
+name: Research 7.1 Blossom resource coverage
+
+on:
+  push:
+    branches:
+      - research/71-blossom-flat-scene-probe
+    paths:
+      - scripts/audit_blossom_native_source_71.py
+      - .github/workflows/research-blossom-source-71.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out resource tree and flat scene index
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            ExcelBinOutput/BlossomGroupsExcelConfigData.json
+            ScriptSceneData/flat.luas.scenes.full_globals.lua.json
+            Scripts/Scene/3/scene3_group133403311.lua
+            Scripts/Scene/3/scene3_group133412176.lua
+            scripts/audit_blossom_native_source_71.py
+          sparse-checkout-cone-mode: false
+      - name: Audit imported camp group coverage
+        run: python3 scripts/audit_blossom_native_source_71.py
