@@ -1,0 +1,82 @@
+# Incomplete blossom Lua files: removal inventory
+
+Base: RinoPaw/AstaPS-Resource@c0213668889ed05cbeb86660f424c3daf18bfacd.
+This is a fork resource inventory; it does not authenticate Global 7.1 client or server data.
+74 group scripts and one TODO-only shared module are listed for removal.
+Other gadgets in those group scripts are also affected. Git preserves their history.
+
+- Scripts/Common/V2_0/BlossomGroup.lua
+- Scripts/Scene/1/scene1_group111101162.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133210452.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133210453.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133210454.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133210455.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133212081.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133212082.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133212083.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133212091.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133213037.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133213075.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133213077.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133213078.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133213079.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133217163.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133217164.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133217165.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133217166.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133217167.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133220475.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133220476.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133220478.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133220479.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133301081.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133301098.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133301120.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133301190.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133303002.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133303003.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133303004.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133303005.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133303006.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133304005.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133304006.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133304007.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133304008.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133304009.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133307035.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133307043.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133307044.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133307045.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133307047.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133308129.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133308131.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133308133.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133308134.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133308135.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133310262.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133310263.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133310264.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133310265.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133314204.lua
+- Scripts/Scene/3/scene3_group133314313.lua
+- Scripts/Scene/3/scene3_group133314317.lua
+- Scripts/Scene/3/scene3_group133315001.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133315002.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133315003.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133315004.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133315115.lua [requires TODO shared module]
+- Scripts/Scene/3/scene3_group133403311.lua
+- Scripts/Scene/3/scene3_group133412176.lua
+- Scripts/Scene/3/scene3_group133501642.lua
+- Scripts/Scene/3/scene3_group133501732.lua
+- Scripts/Scene/3/scene3_group133502486.lua
+- Scripts/Scene/3/scene3_group133504636.lua
+- Scripts/Scene/3/scene3_group133508423.lua
+- Scripts/Scene/3/scene3_group133520340.lua
+- Scripts/Scene/3/scene3_group133520343.lua
+- Scripts/Scene/3/scene3_group133601147.lua
+- Scripts/Scene/3/scene3_group133601150.lua
+- Scripts/Scene/3/scene3_group133601247.lua
+- Scripts/Scene/3/scene3_group133601253.lua
+- Scripts/Scene/3/scene3_group133611487.lua
+- Scripts/Scene/3/scene3_group133708033.lua
